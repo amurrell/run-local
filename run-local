@@ -3,13 +3,16 @@
 ## RUN LOCAL SCRIPT
 # This script is intended to be run from the root of a project repository.
 # It is a wrapper script to run commands in the DockerLocal environment.
-# Alter your project's values in PROJECT SPECIFIC DEFAULTS section below.
+# Alter your project's values in rl-vars to customize the script for your project.
 
-# Note: Dot Env Vars
-# This version of run-local does not support .env file secrets unique to applications.
-# - You just need to take care of those yourself if you need them.
-#
-# It was written to work with PHP env vars (via DockerLocal/env.yml)
+# To add to a project (1x setup):
+# - [README.md](https://github.com/amurrell/run-local/blob/main/README.md)
+# To local dev setup (customize & share with your team):
+# - [README-TEMPLATE.md](https://github.com/amurrell/run-local/blob/main/README-TEMPLATE.md)
+
+#### The scripts run-local and rl-alias are meant to stay free of customization so they can be updated easily.
+#### Of course you can fork it, but still follow this pattern to keep it easy to update across projects.
+#### 👉 Customize your project in rl-vars, rl-extended and rl-funcs/rl-* files.
 
 # Save the initial directory where the script was executed
 INITIAL_DIR=$(pwd)

@@ -143,8 +143,13 @@ To **add run-local as your local development tool**, follow these steps as a 1-t
 1. Consider adding `rl-extended` and `rl-funcs` functions for your project, changing however you need, adding only relevant ones, your making your own, based on these.
 
    ```bash
+   # Core Customization Files
    # rl-extended
    wget https://raw.githubusercontent.com/amurrell/run-local/main/rl-extended && chmod +x rl-extended
+   # rl-post-install
+   wget https://raw.githubusercontent.com/amurrell/run-local/main/rl-post-install && chmod +x rl-post-install
+
+   # More specific customizations
    # composer
    mkdir -p rl-funcs && cd rl-funcs
    wget https://raw.githubusercontent.com/amurrell/run-local/main/rl-funcs/rl-composer && chmod +x rl-composer
@@ -156,8 +161,13 @@ To **add run-local as your local development tool**, follow these steps as a 1-t
       <summary>See: Curl</summary>
 
    ```bash
+   # Core Customization Files
    # rl-extended
    curl -O https://raw.githubusercontent.com/amurrell/run-local/main/rl-extended && chmod +x rl-extended
+   # rl-post-install
+   wget https://raw.githubusercontent.com/amurrell/run-local/main/rl-post-install && chmod +x rl-post-install
+
+   # More specific customizations
    # composer
    mkdir -p rl-funcs && cd rl-funcs
    curl -O https://raw.githubusercontent.com/amurrell/run-local/main/rl-funcs/rl-composer && chmod +x rl-composer
@@ -169,13 +179,43 @@ To **add run-local as your local development tool**, follow these steps as a 1-t
 
    ***
 
-1. Run `./run-local install` and follow the prompts, using your copy of the `README-TEMPLATE` as a guide (and make notes in it as you go). If your project is not yet a git repo, it will ask you to `git init`. If you do not have `DockerLocal`, it will be pulled in as a submodule for you.
+1. Run `./run-local install` and follow the prompts, using your copy of the `README-TEMPLATE` as a guide (and make notes in it as you go). If your project is not yet a git repo, it will ask you to `git init`. If you do not have `DockerLocal`, it will be pulled in as a submodule for you. It may be worth reading the next step to understand how to customize the `rl-extended` and `rl-funcs` files so that your app can install successfully.
+
+1. Using the `rl-extended` and `rl-funcs/rl-*` files for customization. One very useful **function** that stands out is `rl-funcs/rl-post-install`. If you pull `rl-extended`, `post_install` will run on `rl install` via `rl-funcs/post_install`.
+
+   <details>
+      <summary>key areas to customize are:</summary>
+
+   ```bash
+   # Comment out or remove any functions you don't need, and renumber the list
+   show_help_extended()...
+
+   handle_rl_extended_choice() {
+   case $1 in
+      e1) ./run-local list ;;
+      e2) ./run-local post-install ;;
+      e3) ./run-local artisan ;;
+      e4) ./run-local debug-artisan ;;
+      e5) ./run-local tinker ;;
+      e6) ./run-local debug-tinker ;;
+      e7) ./run-local assets ;;
+      *)
+         step_text "No (valid) $1 option chosen... Quitting."
+         exit 0
+   esac
+   }
+
+   # Edit options in
+   handle_rl_extended()...
+   ```
+
+   </details>
 
 ---
 
 ### rl alias
 
-The `rl` alias is a shortcut to run the `run-local.sh` script. You can run it from **anywhere** and it will prompt for which run-local project you want to run when you have multiple projects in a code directory (defined by `RL_DEV_FOLDER` in your shell profile).
+The `rl` alias is a shortcut to run the `run-local.sh` script. You can run it from **anywhere** and it will prompt for which run-local project you want to run when you have multiple projects in a code directory (defined by `RL_DEV_FOLDER` in your shell profile). Running `run-local` shoulld install the alias for you, so test it out!
 
 **Usage**
 
