@@ -1,0 +1,74 @@
+# shellcheck disable=SC2148
+# Define the directories to search for run-local scripts (2 levels deep)
+RL_DEV_FOLDERS=(
+  "${HOME}/code"
+)
+
+# Define the alias function
+rl() {
+  # Check if the current directory has a run-local script
+  if [ -f "./run-local" ]; then
+    ./run-local "$@"
+    return
+  fi
+
+  # Initialize an empty array for run-local scripts
+  RUN_LOCAL_SCRIPTS=()
+
+  # Ensure compatibility with both Bash and Zsh
+  if [ -n "$ZSH_VERSION" ]; then
+    setopt sh_word_split  # Ensure word splitting works in Zsh
+  fi
+
+  # Search for run-local scripts in the specified directories
+  for folder in "${RL_DEV_FOLDERS[@]}"; do
+    if [ -d "$folder" ]; then
+      while IFS= read -r script; do
+        RUN_LOCAL_SCRIPTS+=("$script")  # Append correctly for Bash & Zsh
+      done < <(find "$folder" -maxdepth 2 -name 'run-local')
+    fi
+  done
+
+  # If no run-local scripts are found, print an error message and exit
+  if [ ${#RUN_LOCAL_SCRIPTS[@]} -eq 0 ]; then
+    echo "No run-local scripts found in the specified directories."
+    return 1
+  fi
+
+  # Display the list of found run-local scripts with colors and formatted numbers
+  echo -e "\nAvailable \033[38;5;73mrun-local\033[0m scripts:"
+
+  unset options  # Ensure the array is cleared before use
+  declare -a options  # Explicitly declare an indexed array
+
+  index=1
+  for script in "${RUN_LOCAL_SCRIPTS[@]}"; do
+    dir_name=$(dirname "$script")
+    printf "\033[38;5;73m%s)\033[0m %s\n" "$index" "$dir_name"
+    options+=("$dir_name")
+    ((index++))
+  done
+
+  echo ""
+  PS3="Select a run-local script to execute: "
+
+  # Make sure `select` works in both Bash & Zsh
+  if [ -n "$ZSH_VERSION" ]; then
+    setopt no_nomatch  # Prevent issues with array expansion
+  fi
+
+  select opt in "${options[@]}"; do
+    if [[ -n "$opt" ]]; then
+      # Change to the directory containing the selected script and execute it
+      cd "$opt" || return
+      ./run-local "$@"
+      break
+    else
+      echo "Invalid selection. Please try again."
+    fi
+  done
+
+}
+
+# Add the alias to the shell configuration
+alias rl=rl

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+run_tinker_command() {
+  # Execute the site-ssh command with proper user and directory context
+  (cd "$COMMANDS_DIR" && ./site-ssh -h=web -c="cd /var/www/site && php artisan tinker")
+}
+
+run_debug_tinker_command() {
+  (cd "$COMMANDS_DIR" && ./site-ssh -h=web -c="cd /var/www/site && XDEBUG_MODE=debug XDEBUG_CONFIG=\"client_port=$XDEBUG_CLI_PORT\" php artisan tinker")
+}

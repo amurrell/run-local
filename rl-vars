@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+PROJECT_NAME="🐣 YOUR PROJECT"
+
+# Relevant Use Case: create_default_file function
+DEFAULT_PORT="3000"
+DEFAULT_DB_NAME="myprojectdb"
+DEFAULT_WEB_SERVER_ROOT="/var/www/site/html"
+DEFAULT_PHP_VERSION="8.2"
+DEFAULT_UBUNTU_RELEASE_NAME="jammy"
+DEFAULT_UBUNTU_VERSION="22.04"
+DEFAULT_YAML_VERSION="2.2.3"
+DEFAULT_NVM_VERSION="18.17.1"
+DEFAULT_DB_IMAGE="mariadb:10.6"
+# Where package.json is, relative to the repo. eg. wp-content/themes/yourtheme
+DEFAULT_APP_PATH=""
+
+# Unique to your package.json - what's the command to start your app, locally?
+DEFAULT_NPM_COMMAND="npm run dev"
+
+# Less likely to need to change for local development - this is default for DockerLocal/env.yml
+DEFAULT_DB_PASSWORD="1234"
+
+# Custom MySQL/MariaDB configuration - used in install function
+DB_CUSTOM_CONF=$(cat <<EOF
+[mysqld]
+EOF
+)
+
+# Custom DockerFIle settings for NGINX - used in install function
+# Pick 1 line to "replace" with your block (that adds it back in). eg. `# Remove pool.d/www.conf` replaced with
+# ```
+# `Block of stuff
+# `Block of stuff
+# `
+# `# Remove pool.d/www.conf
+# ```
+DOCKERFILE_CUSTOM_CONF=$(cat <<EOF
+# change upload_max, post max, memory limit
+RUN sed -i "/;upload_max_filesize = .*/c\upload_max_filesize = 20M" /etc/php/PHP_VERSION/fpm/php.ini && \
+	sed -i "/upload_max_filesize = .*/c\upload_max_filesize = 20M" /etc/php/PHP_VERSION/fpm/php.ini && \
+	sed -i "/;post_max_size = .*/c\post_max_size = 64M" /etc/php/PHP_VERSION/fpm/php.ini && \
+	sed -i "/post_max_size = .*/c\post_max_size = 64M" /etc/php/PHP_VERSION/fpm/php.ini && \
+	sed -i "/;memory_limit = .*/c\memory_limit = 256M" /etc/php/PHP_VERSION/fpm/php.ini && \
+	sed -i "/memory_limit = .*/c\memory_limit = 256M" /etc/php/PHP_VERSION/fpm/php.ini
+
+# Remove pool.d/www.conf
+EOF
+)
+DOCKERFILE_REPLACE_LINE="Remove pool.d/www.conf"
+
+# rl-extended and rl-funcs variables
+# rl-laravel
+# LARAVEL_ENV_FILE="$REPO_ROOT/.env"
+# LARAVEL_ENV_EXAMPLE_FILE="$REPO_ROOT/.env.example"
+
+# Export rl-extended variables
+
+# export LARAVEL_ENV_FILE
+# export LARAVEL_ENV_EXAMPLE_FILE
+
+# Export all variables
+
+export PROJECT_NAME
+export DEFAULT_PORT
+export DEFAULT_DB_NAME
+export DEFAULT_WEB_SERVER_ROOT
+export DEFAULT_PHP_VERSION
+export DEFAULT_UBUNTU_RELEASE_NAME
+export DEFAULT_UBUNTU_VERSION
+export DEFAULT_YAML_VERSION
+export DEFAULT_NVM_VERSION
+export DEFAULT_DB_IMAGE
+export DEFAULT_APP_PATH
+
+export DEFAULT_NPM_COMMAND
+export DEFAULT_DB_PASSWORD
+
+export DB_CUSTOM_CONF
+export DOCKERFILE_CUSTOM_CONF
+export DOCKERFILE_REPLACE_LINE
+
