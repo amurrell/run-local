@@ -1,34 +1,23 @@
 #!/usr/bin/env bash
 
 laravel_post_install() {
-    # Copy .env.example to .env if .env does not exist
-    if [ ! -f "$LARAVEL_ENV_FILE" ]; then
-      if [ -f "$LARAVEL_ENV_EXAMPLE_FILE" ]; then
-        cp "$LARAVEL_ENV_EXAMPLE_FILE" "$LARAVEL_ENV_FILE"
-        echo "=== Copied .env.example to .env - you can edit values (eg. secret credentials) later"
-      else
-        echo "=== ❌ Error: .env.example file not found. Please ensure it exists."
-        exit 1
-      fi
-    fi
-
     # Run Composer install
-    echo "=== Installing Composer dependencies..."
+    step_text "Installing Composer dependencies..."
     ./run-local composer install
-    echo "=== ☑️ Composer install process done"
+    step_text "☑️ Composer install process done"
 
     # Generate Laravel APP_KEY
     # check the .env file for the APP_KEY having a value
-    if grep -q "APP_KEY=base64:[A-Za-z0-9+/]" "$LARAVEL_ENV_FILE"; then
-      echo "=== ☑️ APP_KEY value found in .env file. Skipping key generation."
+    if grep -q "APP_KEY=base64:[A-Za-z0-9+/]" "$APP_ENV_FILE"; then
+      step_text "☑️ APP_KEY value found in .env file. Skipping key generation."
     else
-      echo "=== Generating Laravel APP_KEY..."
+      step_text "Generating Laravel APP_KEY..."
       (cd "$COMMANDS_DIR" && ./site-ssh -h=web -c="cd /var/www/site && php artisan key:generate")
-      echo "=== ☑️ Laravel APP_KEY generated."
+      step_text "☑️ Laravel APP_KEY generated."
     fi
 
     # Run database migrations
-    echo "=== 🏃‍♀️ Running database migrations..."
+    step_text "🏃‍♀️ Running database migrations..."
     ./run-local artisan migrate
 
 }

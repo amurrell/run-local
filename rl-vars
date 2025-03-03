@@ -11,7 +11,8 @@ DEFAULT_UBUNTU_RELEASE_NAME="jammy"
 DEFAULT_UBUNTU_VERSION="22.04"
 DEFAULT_YAML_VERSION="2.2.3"
 DEFAULT_NVM_VERSION="18.17.1"
-DEFAULT_DB_IMAGE="mariadb:10.6"
+DEFAULT_DB_IMAGE="mariadb:10.6" # can choose mysql or mariadb
+
 # Where package.json is, relative to the repo. eg. wp-content/themes/yourtheme
 DEFAULT_APP_PATH=""
 
@@ -26,6 +27,9 @@ DB_CUSTOM_CONF=$(cat <<EOF
 [mysqld]
 EOF
 )
+
+APP_ENV_FILE="$REPO_ROOT/.env"
+APP_ENV_EXAMPLE_FILE="$REPO_ROOT/.env.example"
 
 # Custom DockerFIle settings for NGINX - used in install function
 # Pick 1 line to "replace" with your block (that adds it back in). eg. `# Remove pool.d/www.conf` replaced with
@@ -50,14 +54,21 @@ EOF
 DOCKERFILE_REPLACE_LINE="Remove pool.d/www.conf"
 
 # rl-extended and rl-funcs variables
-# rl-laravel
-# LARAVEL_ENV_FILE="$REPO_ROOT/.env"
-# LARAVEL_ENV_EXAMPLE_FILE="$REPO_ROOT/.env.example"
+
+# rl-assets
+ASSETS_SSH_SERVER='root@hostname' # to be used with ssh & scp (use ssh config to make this easier)
+ASSETS_SSH_SERVER_SOURCE_DIR='/var/www/yourproject.com/wp-content/uploads'
+ASSETS_FILE='rl-assets-download'  # we will append a timestamp, tar.gz
+ASSETS_LOCAL_PATH="$REPO_ROOT/html/wp-content/uploads"
+ASSETS_DOWNLOAD_PATH="$REPO_ROOT/$DATA_DIR/$ASSETS_FILE"
 
 # Export rl-extended variables
 
-# export LARAVEL_ENV_FILE
-# export LARAVEL_ENV_EXAMPLE_FILE
+export ASSETS_SSH_SERVER
+export ASSETS_SSH_SERVER_SOURCE_DIR
+export ASSETS_FILE
+export ASSETS_LOCAL_PATH
+export ASSETS_DOWNLOAD_PATH
 
 # Export all variables
 
@@ -75,6 +86,9 @@ export DEFAULT_APP_PATH
 
 export DEFAULT_NPM_COMMAND
 export DEFAULT_DB_PASSWORD
+
+export APP_ENV_FILE
+export APP_ENV_EXAMPLE_FILE
 
 export DB_CUSTOM_CONF
 export DOCKERFILE_CUSTOM_CONF

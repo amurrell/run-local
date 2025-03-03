@@ -1,8 +1,10 @@
-# RunLocal [Your Project]
+# [Your Project]
 
 This repository is:
 
-- Website for [yourproject.com](https://yourproject.com).
+- A website or API most likely: [yourproject.com](https://yourproject.com)
+- It is using [DockerLocal](https://github.com/amurrell/DockerLocal) for local containerization
+- It is using [run-local](https://github.com/amurrell/run-local) for enjoyable local development
 
 ## Local Development Install
 
@@ -19,19 +21,19 @@ This repository is:
 1. Clone this repository, ideally at same level as `ProxyLocal` (if using ProxyLocal)
 
    ```bash
-   git clone git@github.com/YOU/YOURPROJECT.git
+   git clone git@github.com/PROJECTOWNER/YOURPROJECT.git
    ```
 
 1. `cd YOURPROJECT`
 1. `./run-local.sh install` & follow prompts!
 1. Visit http://localhost:PORT and/or http://docker.yourproject.com
-1. Add [`rl` alias](#rl-alias) to `.zshrc` (not tested for bash)
+1. Open a new terminal window and run `rl` to test alias works.
 
 ---
 
 ### rl alias
 
-The `rl` alias is a shortcut to run the `run-local.sh` script. It's a good idea to add this to your `.zshrc` file. You can run it from **ANYWHERE** (above & adjacent) and it will prompt for which run-local project you want to run.
+The `rl` alias is a shortcut to run the `run-local.sh` script. You can run it from **anywhere** and it will prompt for which run-local project you want to run when you have multiple projects in a code directory (defined by `RL_DEV_FOLDER` in your shell profile).
 
 **Usage**
 
@@ -45,7 +47,8 @@ Available run-local scripts:
 Select a run-local script to execute:
 ```
 
-**Setup**
+<details>
+   <summary>See: Manual Setup</summary>
 
 If you already have an **rl-alias**, you can skip this step.
 
@@ -54,12 +57,20 @@ If you already have an **rl-alias**, you can skip this step.
 rl=rl
 ```
 
-You can use the `rl-alias` that came with your project or from the **run-local** repo, if you have it.
+If you do not have it in your shell profile (eg. `~/.zshrc`), you can add it manually.
+
+**Update Values** for `DEV_FOLDER` (above your project) and `SHELL_PROFILE`, **Change Directory** to project root, where `rl-alias` is located, and then paste in your terminal all at once:
 
 ```bash
-ln -s rl-alias "${HOME}/code/rl-alias"
-echo '# Run Local Alias' >> ~/.zshrc
-echo 'RL_DEV_FOLDER="${HOME}/code"' >> ~/.zshrc
-echo 'source "${RL_DEV_FOLDER}/rl-alias"' >> ~/.zshrc
-source ~/.zshrc
+# Update these values
+DEV_FOLDER=${HOME}/code
+SHELL_PROFILE=${HOME}/.zshrc
+
+ln -s rl-alias "$DEV_FOLDER/rl-alias"
+echo "# Run Local Alias" >> "$SHELL_PROFILE"
+echo "RL_DEV_FOLDER=${DEV_FOLDER}" >> "$SHELL_PROFILE"
+echo "source $DEV_FOLDER/rl-alias" >> "$SHELL_PROFILE"
+source "$SHELL_PROFILE"
 ```
+
+</details>

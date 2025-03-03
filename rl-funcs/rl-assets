@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+
+assets_backup() {
+  # take a backup of the current uploads directory
+  step_text "Backing up current assets directory"
+  # add time-stamp
+  CURRENT_FILE_NAME="rl-assets-backup-$(date +%Y%m%d%H%M%S).tar.gz"
+  tar -czf "$DATA_DIR/$CURRENT_FILE_NAME" -C "$(dirname "$ASSETS_LOCAL_PATH")" "$(basename "$ASSETS_LOCAL_PATH")"
+  # see if that worked before moving on
+  if [ $? -ne 0 ]; then
+    step_text "❌ Failed to backup current assets directory"
+    exit 1;
+  fi
+}
+
+assets_swap() {
+  replace_file="$1" # will be full path to the file
+
+  # check if the file exists
+  if [ ! -f "$replace_file" ]; then
+    step_text "❌ File $replace_file does not exist"
+    exit 1;
+  fi
+
+  # take a backup of the current uploads directory
+  assets_backup
+
+  # remove the directory
+  # prompt to ask if they want to remove the directory
+  read -r -p "Check Backup. Then remove $ASSETS_LOCAL_PATH directory? [y/N] " response
+  if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+    step_text "Removing current assets directory..."
+    rm -rf "$ASSETS_LOCAL_PATH"
+  else
+    step_text "Skipping removal of current assets directory..."
+    step_text "Exiting... no swap done."
+    exit 1;
+  fi
+
+  ## Now we can replace the uploads directory
+  step_text "Replacing uploads directory with $replace_file..."
+  # extract the file - add -C to extract to the uploads directory
+  tar -xzf "$replace_file" -C "$(dirname "$ASSETS_LOCAL_PATH")"
+}
+
+assets_download() {
+  # if ASSETS_SSH_SERVER is empty, exit - echo that we cannot download. Do it manually
+  if [ -z "$ASSETS_SSH_SERVER" ]; then
+    echo "ASSETS_SSH_SERVER is not set in rl-vars. Cannot download assets."
+    step_text "Please set ASSETS_SSH_SERVER in rl-vars or put a tar.gz file in $DATA_DIR manually."
+    exit 1;
+  fi
+
+  local file_name, source_folder, dir_path
+  file_name="$ASSETS_FILE-$(date +%Y%m%d%H%M%S).tar.gz"
+  # eg. uploads
+  source_folder=$(basename "$ASSETS_SSH_SERVER_SOURCE_DIR")
+  # e.g /var/www/site/wp-content/
+  dir_path=$(dirname "$ASSETS_SSH_SERVER_SOURCE_DIR")
+
+  # try to do ssh commands
+  step_text "Pass tar command via ssh to $SERVER"
+  ssh "$SERVER" -c "tar -czf ~/${file_name} -C ${dir_path} ${source_folder}"
+
+  # if fail, exit
+  if [ $? -ne 0 ]; then
+    echo "Failed to create $file_name on $SERVER"
+    return
+  fi
+
+  # download the file
+  step_text "Downloading $file_name from $SERVER..."
+  scp "$SERVER:~/$file_name" "$ASSETS_DOWNLOAD_PATH"
+
+  if [ $? -ne 0 ]; then
+    echo "Failed to download $file_name from $SERVER"
+    return
+  fi
+
+  step_text "Downloaded $file_name to $ASSETS_DOWNLOAD_PATH"
+}
+
+assets_upload() {
+  # check $DATA_DIR for .tar.gz files
+  if [ -z "$(ls -A "$DATA_DIR")" ]; then
+    echo "No .tar.gz files found in $DATA_DIR"
+  else
+    echo "Found .tar.gz files in $DATA_DIR"
+    # prompt for which file to use to replace current uploads directory
+    # add option to fetch from server
+    echo "Select a file to use to replace the current uploads directory"
+    mapfile -t options < <(find "$DATA_DIR" -maxdepth 1 -name "*.tar.gz")
+    select opt in "${options[@]}" "Fetch from server" "Quit"; do
+      case $opt in
+        "Fetch from server")
+          assets_download
+          break
+          ;;
+        "Quit")
+          break
+          ;;
+        *)
+          echo "You chose $opt"
+          assets_swap "$opt"
+          break
+          ;;
+      esac
+    done
+  fi
+}

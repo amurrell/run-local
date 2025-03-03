@@ -5,7 +5,7 @@ prompt_artisan_command() {
     if [ -z "$2" ]; then
       read -rp "Enter the Artisan command you want to run (e.g., 'route:list'): " ARTISAN_COMMAND
       if [ -z "$ARTISAN_COMMAND" ]; then
-        echo "=== No command entered. Returning to menu."
+        step_text "No command entered. Returning to menu."
         show_menu
         exit 0
       fi

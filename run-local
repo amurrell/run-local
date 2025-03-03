@@ -23,6 +23,8 @@ RL_ALIAS_FILE_NAME="rl-alias"
 RL_EXTENDED_FILE_NAME="rl-extended"
 RL_DEV_FOLDER_VAR_NAME="RL_DEV_FOLDER"
 RL_FUNC_FOLDER="rl-funcs"
+# exporting to use - used by rl-extended
+export RL_FUNC_FOLDER
 
 # Determine the root of the repository
 REPO_ROOT=$(dirname "$(realpath "$0")")
@@ -35,7 +37,7 @@ check_file() {
   if [ ! -f "$file" ]; then
 
     if [ "$fail_if_not_found" = true ]; then
-      step_text " ❌ Error: $1 file not found."
+      step_text "❌ Error: $1 file not found."
       exit 1
     fi
 
@@ -55,9 +57,11 @@ check_function() {
   fi
 }
 
+DOCKERLOCAL_REPO_URL="https://github.com/amurrell/DockerLocal.git"
 # DockerLocal Directories
 COMMANDS_DIR="$REPO_ROOT/DockerLocal/commands"
 DATA_DIR="$REPO_ROOT/DockerLocal/data"
+export DATA_DIR # used by rl-funcs/rl-assets
 DATA_DUMPS_DIR="$REPO_ROOT/DockerLocal/data/dumps"
 CUSTOM_MYSQL_CONF_DIR="$REPO_ROOT/DockerLocal/data/custom"
 # DockerLocal Config Files
@@ -248,7 +252,7 @@ show_menu() {
       if check_function 'handle_rl_extended_choice'; then
         handle_rl_extended_choice "$choice"
       else
-        step_text " No (valid) option chosen... Quitting."
+        step_text "No (valid) option chosen... Quitting."
         exit 0
       fi
       ;;
@@ -266,19 +270,31 @@ dl() {
 
   # if not a git repo, modules would not work, detect that
   if [ ! -d ".git" ]; then
-    step_text " ❌ Error: Not a git repository. Cannot run git submodule update. Run 'git init' first."
+    step_text "❌ Error: Not a git repository. Cannot run git submodule update. Run 'git init' first."
     exit 1
   fi
 
   if [ -f ".gitmodules" ] && grep -q 'DockerLocal' ".gitmodules"; then
     # Initialize and update submodules
-    step_text " Initializing and updating submodules..."
+    step_text "Initializing and updating submodules..."
     git submodule update --init --recursive
   else
     echo "No submodules found. DockerLocal is required, as run-local is a wrapper for it!"
-    exit 1
+    # prompt to add submodule
+    read -rp "Do you want to add DockerLocal as a submodule? (Y/N): " RESPONSE
+    case $RESPONSE in
+      [Yy]*)
+        step_text "Adding DockerLocal as a submodule..."
+        # need to probably git clone?
+        git submodule add "$DOCKERLOCAL_REPO_URL" DockerLocal
+        ;;
+      *)
+        step_text "Exiting setup. Add DockerLocal as a submodule and re-run this script."
+        exit 0
+        ;;
+    esac
   fi
-  step_text " ☑️ DockerLocal initialized."
+  step_text "☑️ DockerLocal initialized."
 }
 
 # Check if rl alias exists with 'alias rl'
@@ -299,15 +315,15 @@ setup_alias() {
 
     # if symlink does not exist, create it.
     if [ ! -L "$DETECT_DEV_FOLDER/$RL_ALIAS_FILE_NAME" ]; then
-      step_text " Creating symlink to $RL_ALIAS_FILE_NAME in $DETECT_DEV_FOLDER"
+      step_text "Creating symlink to $RL_ALIAS_FILE_NAME in $DETECT_DEV_FOLDER"
       ln -s "$DETECT_DEV_FOLDER/$RL_ALIAS_FILE_NAME" "$DETECT_DEV_FOLDER/$RL_ALIAS_FILE_NAME"
     fi
 
     # for each shell profile that is found
     for SHELL_PROFILE_FILE in "${SHELL_PROFILES[@]}"; do
       if [ -f "$SHELL_PROFILE_FILE" ]; then
-        step_text " Found $SHELL_PROFILE_FILE - adding alias to it."
-        step_text " Source it, or open new terminal to use 'rl' alias."
+        step_text "Found $SHELL_PROFILE_FILE - adding alias to it."
+        step_text "Source it, or open new terminal to use 'rl' alias."
         {
           echo ""
           echo "# Run Local Alias"
@@ -325,16 +341,16 @@ create_default_file() {
   local default_content="$2"
   if [ ! -f "$file_path" ]; then
     echo "$default_content" > "$file_path"
-    step_text " Created default configuration file: $file_path with contents: $default_content"
+    step_text "Created default configuration file: $file_path with contents: $default_content"
   fi
 }
 
 # Function to check install configuration
 install_configuration_step() {
   if [ -f "$REPO_ROOT/DockerLocal/env-custom.yml" ]; then
-    step_text " Docker containers initialized (detected env-custom.yml), so skipping default configuration prompts."
+    step_text "Docker containers initialized (detected env-custom.yml), so skipping default configuration prompts."
   else
-    step_text " Default configurations:"
+    step_text "Default configurations:"
     printf "  - Port: \e[32m%s\e[0m (defined in DockerLocal/port)\n" "$DEFAULT_PORT"
     printf "  - DB Name: \e[32m%s\e[0m (defined in DockerLocal/database)\n" "$DEFAULT_DB_NAME"
     printf "  - Web Server Root: \e[32m%s\e[0m (defined in DockerLocal/web-server-root)\n" "$DEFAULT_WEB_SERVER_ROOT"
@@ -344,21 +360,21 @@ install_configuration_step() {
     printf "  - Ubuntu Version: \e[32m%s\e[0m (defined in DockerLocal/versions/override-ubuntu-version)\n" "$DEFAULT_UBUNTU_VERSION"
     printf "  - YAML Version: \e[32m%s\e[0m (defined in DockerLocal/versions/override-yaml-version)\n" "$DEFAULT_YAML_VERSION"
     printf "  - NVM Version: \e[32m%s\e[0m (defined in DockerLocal/versions/override-nvm-version)\n" "$DEFAULT_NVM_VERSION"
-    step_text " "
-    step_text " If you want to change these settings, create/edit the respective files:"
-    step_text "   - DockerLocal/port"
-    step_text "   - DockerLocal/database"
-    step_text "   - DockerLocal/web-server-root"
-    step_text "   - DockerLocal/versions/override-db-image"
-    step_text "   - DockerLocal/versions/override-php-version"
-    step_text "   - DockerLocal/versions/override-ubuntu-release-name"
-    step_text "   - DockerLocal/versions/override-ubuntu-version"
-    step_text "   - DockerLocal/versions/override-yaml-version"
-    step_text "   - DockerLocal/versions/override-nvm-version"
-    step_text " "
+    step_text ""
+    step_text "If you want to change these settings, create/edit the respective files:"
+    step_text "  - DockerLocal/port"
+    step_text "  - DockerLocal/database"
+    step_text "  - DockerLocal/web-server-root"
+    step_text "  - DockerLocal/versions/override-db-image"
+    step_text "  - DockerLocal/versions/override-php-version"
+    step_text "  - DockerLocal/versions/override-ubuntu-release-name"
+    step_text "  - DockerLocal/versions/override-ubuntu-version"
+    step_text "  - DockerLocal/versions/override-yaml-version"
+    step_text "  - DockerLocal/versions/override-nvm-version"
+    step_text ""
     read -rp "Continue with these default settings? (Y/N): " RESPONSE
     if [[ ! "$RESPONSE" =~ ^[Yy]$ ]]; then
-      step_text " Exiting setup. Modify the configuration files and re-run this script."
+      step_text "Exiting setup. Modify the configuration files and re-run this script."
       exit 0
     fi
   fi
@@ -368,40 +384,40 @@ install_configuration_step() {
 install_modify_nginx_step() {
   # Modification 1: Remove 443 port listen if no proxylocal
   if [ "$USING_PROXYLOCAL" = false ]; then
-    step_text " Modifying nginx.site.conf to comment out content starting at line 54..."
+    step_text "Modifying nginx.site.conf to comment out content starting at line 54..."
     if [ -f "$NGINX_CONF_FILE" ]; then
       # Comment out content starting at line 54 and save to the custom file
       awk 'NR >= 54 { print "#" $0; next } { print }' "$NGINX_CONF_FILE" > "$CUSTOM_NGINX_CONF_FILE"
-      step_text " Lines starting from line 54 commented out and saved to $CUSTOM_NGINX_CONF_FILE."
+      step_text "Lines starting from line 54 commented out and saved to $CUSTOM_NGINX_CONF_FILE."
     else
-      step_text " ❌ Error: $NGINX_CONF_FILE not found. Cannot modify nginx configuration."
+      step_text "❌ Error: $NGINX_CONF_FILE not found. Cannot modify nginx configuration."
       exit 1
     fi
   else
-    step_text " $(color_text faint "Detected ProxyLocal with a site configured for port $PORT")."
-    step_text " Using ProxyLocal - Skipping nginx configuration modifications that would remove listening on port 443."
+    step_text "$(color_text faint "Detected ProxyLocal with a site configured for port $PORT")."
+    step_text "Using ProxyLocal - Skipping nginx configuration modifications that would remove listening on port 443."
   fi
 
   # Modification 2: Check if we need to use a custom Dockerfile snippet.
   # Check if DOCKERFILE_CUSTOM_CONF is empty and leave
   if [ -z "$DOCKERFILE_CUSTOM_CONF" ]; then
-    step_text " No custom Dockerfile configuration found. Skipping Dockerfile modifications."
+    step_text "No custom Dockerfile configuration found. Skipping Dockerfile modifications."
     return
   fi
 
   # Check if the custom Dockerfile exists - if it does skip
   if [ -f "$CUSTOM_DOCKERFILE_TEMPLATE" ]; then
-    step_text " Custom Dockerfile found. Skipping Dockerfile modifications."
+    step_text "Custom Dockerfile found. Skipping Dockerfile modifications."
     return
   fi
 
   # Check if DOCKERFILE_TEMPLATE exists - if it does not, exit, this is a bug
   if [ ! -f "$DOCKERFILE_TEMPLATE_FILE" ]; then
-    step_text " ❌ Error: $DOCKERFILE_TEMPLATE_FILE not found. Cannot create custom Dockerfile based on non-existent template."
+    step_text "❌ Error: $DOCKERFILE_TEMPLATE_FILE not found. Cannot create custom Dockerfile based on non-existent template."
     exit 1
   fi
 
-  step_text " Modifying Dockerfile-template-custom to add custom configuration..."
+  step_text "Modifying Dockerfile-template-custom to add custom configuration..."
   # We need to cp DOCKERFILE_TEMPLATE to CUSTOM_DOCKERFILE_TEMPLATE and replace line "# Remove pool.d/www.conf" with DOCKERFILE_CUSTOM_CONF block
   cp "$DOCKERFILE_TEMPLATE_FILE" "$CUSTOM_DOCKERFILE_TEMPLATE"
 
@@ -413,7 +429,7 @@ install_modify_nginx_step() {
 
   # remove the backup file
   rm "$CUSTOM_DOCKERFILE_TEMPLATE.bak"
-  step_text " Custom Dockerfile created at $CUSTOM_DOCKERFILE_TEMPLATE."
+  step_text "Custom Dockerfile created at $CUSTOM_DOCKERFILE_TEMPLATE."
 }
 
 # Function to check for an SQL file in DockerLocal/data/dumps
@@ -426,26 +442,26 @@ install_check_sql_file() {
     # too many sql file found - ask if they want to import one and which one
     # one sql file found - ask if they want to import it
     if [ -z "$SQL_FILE" ]; then
-      step_text " No SQL file found in $DATA_DUMPS_DIR."
-      step_text " To include a database, place your SQL file in this directory. Note: it must end in '.sql'."
+      step_text "No SQL file found in $DATA_DUMPS_DIR."
+      step_text "To include a database, place your SQL file in this directory. Note: it must end in '.sql'."
       read -rp "Do you want to exit and add a database? (Y/N): " RESPONSE
       case $RESPONSE in
-        [Yy]*) step_text " Exiting setup. Re-run this script again when complete."; exit 1 ;;
-        *) step_text " Continuing without a database..." ;;
+        [Yy]*) step_text "Exiting setup. Re-run this script again when complete."; exit 1 ;;
+        *) step_text "Continuing without a database..." ;;
       esac
     # add a case for finding multiple files - prompt which one to use
     elif [ "$(find "$DATA_DUMPS_DIR" -maxdepth 1 -name '*.sql' | wc -l)" -gt 1 ]; then
-      step_text " Multiple SQL files found in $DATA_DUMPS_DIR."
+      step_text "Multiple SQL files found in $DATA_DUMPS_DIR."
       # ask if they want to import a db
       read -rp "Do you want to import a database? (Y/N): " RESPONSE
       case $RESPONSE in
-        [Yy]*) step_text " Continuing with database import..." ;;
-        *) step_text " Continuing without a database..." ;;
+        [Yy]*) step_text "Continuing with database import..." ;;
+        *) step_text "Continuing without a database..." ;;
       esac
 
       if [ "$RESPONSE" = "Y" ] || [ "$RESPONSE" = "y" ]; then
         # prompt which file to use - select
-        step_text " Select the SQL file you want to import:"
+        step_text "Select the SQL file you want to import:"
         select SQL_FILE in "$DATA_DUMPS_DIR"/*.sql; do
           if [ -n "$SQL_FILE" ]; then
             break
@@ -455,37 +471,53 @@ install_check_sql_file() {
         done
       fi
     else
-      step_text " Found SQL file: $SQL_FILE... may import it later, if db setup has not been done."
+      step_text "Found SQL file: $SQL_FILE... may import it later, if db setup has not been done."
     fi
   fi
 }
 
 # Function to setup env file
 install_setup_env_file() {
-  # skip if env file exists
-  if [ -f "$ENV_FILE" ]; then
-    step_text " Skipping setup of env file. File already exists."
+  local env_file=$1
+  local env_file_example=$2
+  local type=$3
+
+  # if env-file-example is empty, skip
+  if [ -z "$env_file_example" ]; then
+    step_text "Skipping setup of $type env file. No example ['$env_file_example'] file name provided."
     return
   fi
 
-  # Check if the env example file exists
-  if [ ! -f "$ENV_EXAMPLE_FILE" ]; then
-    step_text " ❌ Error: $ENV_EXAMPLE_FILE file not found. Please ensure it exists."
+  # if env file is empty, exit - bc we have example and not env - weird
+  if [ -z "$env_file" ]; then
+    step_text "❌ Error: $type env file ['$env_file'] is empty. Please ensure it exists, as the example does!"
+    exit 1
+  fi
+
+  # skip if env file exists
+  if [ -f "$env_file" ]; then
+    step_text "Skipping setup of $type env file. File already exists!"
+    return
+  fi
+
+  # Check if the env example file exists - but it was set
+  if [ ! -f "$env_file_example" ]; then
+    step_text "❌ Error: $type env example file '$env_file_example' does not exist."
     exit 1
   fi
 
   # Copy env example to env if env does not exist
-  cp "$ENV_EXAMPLE_FILE" "$ENV_FILE"
-  step_text " Copied $ENV_EXAMPLE_FILE to $ENV_FILE."
+  cp "$env_file_example" "$env_file"
+  step_text "Copied $type $(basename "$env_file_example") to $(basename "$env_file")."
 
   # prompt and ask if they have secrets they want to append to the file - they need to be able to paste a block of text
   read -rp "Do you have secrets you want to append to the env file? (Y/N): " RESPONSE
   case $RESPONSE in
     [Yy]*)
-      step_text " Append your secrets to the env file. Press Ctrl+D when done."
-      cat >> "$ENV_FILE"
+      step_text "Append your secrets to the env file. Press Ctrl+D when done."
+      cat >> "$env_file"
       ;;
-    *) step_text " Skipping appending secrets to the env file." ;;
+    *) step_text "Skipping appending secrets to the env file." ;;
   esac
 }
 
@@ -500,7 +532,7 @@ install_site_up_step() {
     (cd "$COMMANDS_DIR" && ./site-up -c="$DEFAULT_DB_NAME")
     # if the site-up command fails, exit
     if [ $? -ne 0 ]; then
-      step_text " ❌ Error: Failed to start Docker environment."
+      step_text "❌ Error: Failed to start Docker environment."
       exit 1
     fi
   fi
@@ -511,7 +543,7 @@ install_detect_no_import_sql() {
   # Check if the SQL file exists AND a my.cnf exists, then printf a message
   # that the db-import of the install appears done, if want to redo it, run db-remove and then run install again
   if [ -n "$SQL_FILE" ] && [ -f "$MY_CNF_FILE" ]; then
-    step_text " ☑️ Database import process appears to be done. If you want to redo it, run 'db-remove' and then run 'install' again."
+    step_text "☑️ Database import process appears to be done. If you want to redo it, run 'db-remove' and then run 'install' again."
     # make SQL_FILE empty so it doesn't try to import again.
     SQL_FILE=""
   fi
@@ -527,15 +559,15 @@ install_import_sql_file() {
     # Create or overwrite the my.cnf file with the specified contents if DB_CUSTOM_CONF is not empty
     if [ -n "$DB_CUSTOM_CONF" ]; then
       echo "$DB_CUSTOM_CONF" > "$MY_CNF_FILE"
-      step_text " Created custom my.cnf at $MY_CNF_FILE with specified contents to handle import."
+      step_text "Created custom my.cnf at $MY_CNF_FILE with specified contents to handle import."
     fi
 
-    step_text " Importing database..."
+    step_text "Importing database..."
     SQL_FILE_BASENAME=$(basename "$SQL_FILE")
 
     # Inform the user about expected time and potential troubleshooting steps
-    step_text " ℹ️ This process should take only a few minutes (no more than 10 minutes, most likely under 3)."
-    step_text " ℹ️ If it is taking too long, please:"
+    step_text "ℹ️ This process should take only a few minutes (no more than 10 minutes, most likely under 3)."
+    step_text "ℹ️ If it is taking too long, please:"
     echo "    - Check your Docker Desktop logs for the MySQL container."
     echo "    - Ensure you have allocated enough Virtual Disk Space."
     # Run the import
@@ -545,45 +577,47 @@ install_import_sql_file() {
 
 # Function to handle installation
 install() {
-  step_text " ⬇️ Install - Running first-time setup..."
+  step_text "⬇️ Install - Running first-time setup..."
 
-  step_text " Checking configuration..."
+  step_text "Checking configuration..."
   install_configuration_step
 
-  step_text " Checking need for modifying nginx configuration..."
+  step_text "Checking need for modifying nginx configuration..."
   install_modify_nginx_step
 
-  step_text " Checking for an SQL file..."
+  step_text "Checking for an SQL file..."
   install_check_sql_file
 
-  step_text " Setting up env file..."
-  install_setup_env_file
+  step_text "Setting up PHP (dockerlocal) env file..."
+  install_setup_env_file "$ENV_FILE" "$ENV_EXAMPLE_FILE" "PHP"
 
-  step_text " Running 1st-time DockerLocal './site-up'..."
+  step_text "Setting up APP env file..."
+  install_setup_env_file "$APP_ENV_FILE" "$APP_ENV_EXAMPLE_FILE" "APP"
+
+  step_text "Running 1st-time DockerLocal './site-up'..."
   install_site_up_step
 
-  step_text " Detect if we should not import SQL File"
+  step_text "Detect if we should not import SQL File"
   install_detect_no_import_sql
 
   if [ -n "$SQL_FILE" ]; then
-    step_text " Importing SQL file..."
+    step_text "Importing SQL file..."
     install_import_sql_file
   fi
 
-  step_text " Checking if we have a post-install command..."
-  if check_post_install; then
-    step_text " Running post-install command..."
-    ./run-local post-install
+  if check_function 'post_install'; then
+    step_text "Running rl-extended post-install command..."
+    post_install
     exit 0
   fi
 
   # Do Default Post Install if nothing
-  step_text " Running default post-install command [run_npm_command]..."
+  step_text "Running default post-install command [run_npm_command]..."
 
   # Run npm command
   run_npm_command "install && $DEFAULT_NPM_COMMAND"
 
-  step_text " ✅ Installation complete! The environment is ready to use."
+  step_text "✅ Installation complete! The environment is ready to use."
   printf "=== Visit the site at \e[32mhttp://localhost:%s\e[0m\n\n" "$PORT"
 }
 
@@ -606,10 +640,10 @@ db_query() {
       SLICE_QUERY="${SLICE_QUERY}..."
     fi
     QUERY="USE $DB_NAME; $QUERY"
-    step_text " Running a query ['${SLICE_QUERY}'] on the database '$DB_NAME' in container '$DOCKER_CONTAINER_DB_NAME'..."
+    step_text "Running a query ['${SLICE_QUERY}'] on the database '$DB_NAME' in container '$DOCKER_CONTAINER_DB_NAME'..."
   else
     SLICE_QUERY=$(echo "$QUERY" | cut -c -15)
-    step_text " Running a query ['${SLICE_QUERY}'] in the database on container '$DOCKER_CONTAINER_DB_NAME'..."
+    step_text "Running a query ['${SLICE_QUERY}'] in the database on container '$DOCKER_CONTAINER_DB_NAME'..."
   fi
 
   docker exec -t "${DOCKER_CONTAINER_DB_NAME}" /bin/bash -c "mysql -u root -p$DB_PASSWORD -e \"$QUERY\""
@@ -617,14 +651,14 @@ db_query() {
 
 # Function to handle database import
 db_import() {
-  step_text " Importing sql file to database '$DB_NAME'..."
+  step_text "Importing sql file to database '$DB_NAME'..."
 
   SQL_FILE_NAME="$1"
 
   # If it is empty, prompt the user for the filename, but show them the available files
   if [ -z "$SQL_FILE_NAME" ]; then
     # provide a list of options to choose from
-    step_text " Select the SQL file you want to import:"
+    step_text "Select the SQL file you want to import:"
     options=("$DATA_DUMPS_DIR"/*.sql)
     for i in "${!options[@]}"; do
       pretty_option "$((i+1)))" "$(basename "${options[$i]}")"
@@ -640,32 +674,32 @@ db_import() {
 
   # Test if that file exists at DockerLocal/data/dumps
   if [ ! -f "$DATA_DUMPS_DIR/$SQL_FILE_NAME" ]; then
-    step_text " ❌ Error: SQL file not found at $DATA_DUMPS_DIR/$SQL_FILE_NAME."
+    step_text "❌ Error: SQL file not found at $DATA_DUMPS_DIR/$SQL_FILE_NAME."
     exit 1
   fi
 
   # Import the SQL file
   (cd "$COMMANDS_DIR" && ./site-db -i="$DB_NAME" -f="$SQL_FILE_NAME")
-  step_text " ✅ Done - Database importing process of [$(color_text primary "$SQL_FILE_NAME")] into db [$(color_text primary "$DB_NAME")]."
+  step_text "✅ Done - Database importing process of [$(color_text primary "$SQL_FILE_NAME")] into db [$(color_text primary "$DB_NAME")]."
 }
 
 # Function to handle database export
 db_export() {
-  step_text " Exporting database '$DB_NAME'..."
+  step_text "Exporting database '$DB_NAME'..."
 
   # Run the export command
   cd "$COMMANDS_DIR" || {
-    step_text " ❌ Error: Could not change to the commands directory."
+    step_text "❌ Error: Could not change to the commands directory."
     exit 1
   }
 
-  step_text " Running database export..."
+  step_text "Running database export..."
   ./site-db -d="$DB_NAME"
 
   # Locate the exported SQL file
   DUMP_FILE="$DATA_DUMPS_DIR/$DB_NAME.sql.dump"
   if [ ! -f "$DUMP_FILE" ]; then
-    step_text " ❌ Error: Expected database dump file not found: $DUMP_FILE"
+    step_text "❌ Error: Expected database dump file not found: $DUMP_FILE"
     exit 1
   fi
 
@@ -676,26 +710,26 @@ db_export() {
   # Rename the dump file
   mv "$DUMP_FILE" "$RENAMED_FILE"
   if [ $? -ne 0 ]; then
-    step_text " ❌ Error: Failed to rename the dump file."
+    step_text "❌ Error: Failed to rename the dump file."
     exit 1
   fi
 
-  step_text " Database export complete. Your dump file is located at:"
-  step_text " $RENAMED_FILE"
+  step_text "Database export complete. Your dump file is located at:"
+  step_text "$RENAMED_FILE"
 }
 
 # Function to remove database volume
 db_remove() {
-  step_text " ⚠️ WARNING: This will permanently remove your database and all data."
-  step_text " ⚠️ If you want to keep your data, run 'db-export' first to back it up."
+  step_text "⚠️ WARNING: This will permanently remove your database and all data."
+  step_text "⚠️ If you want to keep your data, run 'db-export' first to back it up."
   read -rp "Are you sure you want to continue? (Y/N): " RESPONSE
   case $RESPONSE in
     [Nn]*)
-      step_text " ❌ Operation canceled."
+      step_text "❌ Operation canceled."
       exit 0
       ;;
     [Yy]*)
-      step_text " Proceeding with database removal..."
+      step_text "Proceeding with database removal..."
       ;;
     *)
       echo "Invalid response. Operation canceled."
@@ -704,34 +738,34 @@ db_remove() {
   esac
 
   # Step 1: Bring the site down
-  step_text " Stopping the site..."
+  step_text "Stopping the site..."
   ./run-local down
 
   # Step 2: Identify and remove the MySQL volume
-  step_text " Searching for the MySQL volume..."
+  step_text "Searching for the MySQL volume..."
   VOLUME_NAME=$(docker volume ls --filter name=mysql-data-"$PORT" -q)
   if [ -n "$VOLUME_NAME" ]; then
-    step_text " Removing MySQL volume: $VOLUME_NAME..."
+    step_text "Removing MySQL volume: $VOLUME_NAME..."
     docker volume rm "$VOLUME_NAME"
   else
-    step_text " ⚠️ No MySQL volume found matching 'mysql-data-$PORT'."
+    step_text "⚠️ No MySQL volume found matching 'mysql-data-$PORT'."
   fi
 
   # Step 3: Remove DockerLocal/database file
   if [ -f "$DB_NAME_FILE" ]; then
-    step_text " Removing DockerLocal/database file..."
+    step_text "Removing DockerLocal/database file..."
     rm "$DB_NAME_FILE"
   else
-    step_text " ⚠️ DockerLocal/database file not found."
+    step_text "⚠️ DockerLocal/database file not found."
   fi
 
   # Step 4: Re-run the install process
-  step_text " Re-running the install process..."
+  step_text "Re-running the install process..."
   ./run-local install
 }
 
 run_npm_command() {
-  step_text " Running nvm install, nvm use - then npm command"
+  step_text "Running nvm install, nvm use - then npm command"
   # Locate and source the nvm script
   if [ -s "$HOME/.nvm/nvm.sh" ]; then
     # shellcheck disable=SC1091
@@ -749,7 +783,7 @@ run_npm_command() {
   if [ -f "$APP_PATH/package.json" ]; then
     cd "$APP_PATH" || exit 1
   else
-    step_text " ❌ Error: No package.json found in $APP_PATH. Please ensure the path is correct in $APP_PATH_FILE."
+    step_text "❌ Error: No package.json found in $APP_PATH. Please ensure the path is correct in $APP_PATH_FILE."
     exit 1
   fi
 
@@ -768,10 +802,10 @@ site_logs() {
 
 # Ensure the DockerLocal/commands directory exists
 if [ ! -d "$COMMANDS_DIR" ]; then
-  step_text " DockerLocal/commands directory not found. Attempting to initialize submodules..."
+  step_text "DockerLocal/commands directory not found. Attempting to initialize submodules..."
   dl
   if [ ! -d "$COMMANDS_DIR" ]; then
-    step_text " ❌ Error: DockerLocal/commands directory is still missing after initializing submodules."
+    step_text "❌ Error: DockerLocal/commands directory is still missing after initializing submodules."
     exit 1
   fi
 fi
@@ -794,7 +828,7 @@ fi
 # If the PORT file does not exist, prompt the user to run the install script - regardless of what they chose
 # unless they are running the dl command or help command or dl-main command
 if [ ! -f "$PORT_FILE" ] && [ "$1" != "dl" ] && [ "$1" != "help" ] && [ "$1" != "dl-main" ]; then
-  step_text " ❌ Error: DockerLocal/port file not found. Please run the install script first!"
+  step_text "❌ Error: DockerLocal/port file not found. Please run the install script first!"
   exit 1
 fi
 
@@ -885,7 +919,7 @@ case $1 in
     exit 0
     ;;
   dl-main)
-    (cd "$REPO_ROOT/DockerLocal" && git checkout main && cd "$REPO_ROOT" || step_text " ❌ Error: Could not checkout main branch.")
+    (cd "$REPO_ROOT/DockerLocal" && git checkout main && cd "$REPO_ROOT" || step_text "❌ Error: Could not checkout main branch.")
     exit 0
     ;;
   help)
@@ -894,12 +928,12 @@ case $1 in
     ;;
   *)
     if check_function 'handle_rl_extended'; then
-      step_text " Running extended command: $1 ${#:2}"
+      step_text "Running extended command: $1 ${#:2}"
       handle_rl_extended "$1" "${@:2}"
       exit 0
     fi
 
-    step_text " ❌ Error: Unknown command '$1'."
+    step_text "❌ Error: Unknown command '$1'."
     show_menu
     exit 1
     ;;
@@ -912,7 +946,7 @@ TARGET_SCRIPT="$COMMANDS_DIR/$SCRIPT"
 
 # Verify the target script exists
 if [ ! -f "$TARGET_SCRIPT" ]; then
-  step_text " ❌ Error: Script '$SCRIPT' not found in the expected location."
+  step_text "❌ Error: Script '$SCRIPT' not found in the expected location."
   exit 1
 fi
 

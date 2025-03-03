@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+post_install() {
+  # Example of post-install, to put custom things like composer, artisan migrate, etc
+    step_text "Running rl-extended post-install command"
+
+    # Laravel specific
+    step_text "Running Laravel specific post-install commands"
+    laravel_post_install
+
+    # Run npm
+    step_text "Running npm install and $DEFAULT_NPM_COMMAND"
+    run_npm_command "install && $DEFAULT_NPM_COMMAND"
+
+    step_text "✅ Installation complete! The environment is ready to use."
+    printf "=== Visit the site at \e[32mhttp://localhost:%s\e[0m\n\n" "$PORT"
+}

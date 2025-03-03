@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 run_composer_command() {
-  echo "=== Run a Composer command in the web container."
+  step_text "Run a Composer command in the web container."
   # if the user has passed in a command (the first variable passed to this function), use that
   # otherwise, prompt the user for a command
   if [ -n "$1" ]; then
@@ -11,13 +11,13 @@ run_composer_command() {
   fi
 
   if [ -z "$composer_command" ]; then
-    echo "=== No command entered. Returning to menu."
+    step_text "No command entered. Returning to menu."
     show_menu
     return
   fi
 
-  echo "=== Running 'composer $composer_command' inside the web container..."
+  step_text "Running 'composer $composer_command' inside the web container..."
   (cd "$COMMANDS_DIR" && ./site-ssh -h=web -c="cd /var/www/site && composer $composer_command")
 
-  echo "=== ✅ Composer command executed."
+  step_text "✅ Composer command executed."
 }
