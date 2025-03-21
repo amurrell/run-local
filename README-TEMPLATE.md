@@ -74,3 +74,30 @@ source "$SHELL_PROFILE"
 ```
 
 </details>
+
+---
+
+### rl cd
+
+When using the `rl` alias outside of your run-local repos, you can quickly jump to a path in a specific project with `rl cd path/in/project`. Answer the prompt to select the project you want to change to.
+
+**Note:** This is only available when using `rl` alias.
+
+**Usage**
+
+```bash
+# from anywhere - I know I want to go to my wordpress theme for my angelamurrell project
+❯ rl cd html/wp-content/themes/mywebsite
+Available run-local scripts: in /Users/angela/code
+
+1) angelamurrell
+2) verticolabs
+3) run-local
+
+Select a run-local script to execute: 1
+
+=== Changing to /Users/angela/code/angelamurrell:
+
+wp-content/themes/mywebsite on  dev [!?] is 📦 v1.0.0 via  v16.14.2 via 🐘
+❯
+```

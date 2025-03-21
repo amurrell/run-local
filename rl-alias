@@ -1,14 +1,13 @@
 # shellcheck disable=SC2148
-# Define the directories to search for run-local scripts (2 levels deep)
-RL_DEV_FOLDERS=(
-  "${HOME}/code"
-)
+# Define the directory to search for run-local scripts (3 levels deep)
+RL_DEV_FOLDER="${HOME}/code"
 
 # Define the alias function
 rl() {
   # Check if the current directory has a run-local script
-  if [ -f "./run-local" ]; then
-    ./run-local "$@"
+  if [ -f "run-local" ]; then
+    printf "\n=== \033[38;5;73m%s\033[0m:\n" "Found ./run-local - Running..."
+    rl_cd "$@" || ./run-local "$@"
     return
   fi
 
@@ -20,23 +19,22 @@ rl() {
     setopt sh_word_split  # Ensure word splitting works in Zsh
   fi
 
-  # Search for run-local scripts in the specified directories
-  for folder in "${RL_DEV_FOLDERS[@]}"; do
-    if [ -d "$folder" ]; then
-      while IFS= read -r script; do
-        RUN_LOCAL_SCRIPTS+=("$script")  # Append correctly for Bash & Zsh
-      done < <(find "$folder" -maxdepth 2 -name 'run-local')
-    fi
-  done
+  # Search for run-local scripts in the specified directory pattern
+  if [ -d "$RL_DEV_FOLDER" ]; then
+    while IFS= read -r script; do
+      RUN_LOCAL_SCRIPTS+=("$script")  # Append correctly for Bash & Zsh
+      # needs to be a file
+    done < <(find "$RL_DEV_FOLDER" -maxdepth 3 -name 'run-local' -type f)
+  fi
 
   # If no run-local scripts are found, print an error message and exit
   if [ ${#RUN_LOCAL_SCRIPTS[@]} -eq 0 ]; then
-    echo "No run-local scripts found in the specified directories."
+    echo "No run-local scripts found in the specified directory."
     return 1
   fi
 
   # Display the list of found run-local scripts with colors and formatted numbers
-  echo -e "\nAvailable \033[38;5;73mrun-local\033[0m scripts:"
+  echo -e "Available \033[38;5;73mrun-local\033[0m scripts: in \033[38;5;73m$RL_DEV_FOLDER\033[0m\n"
 
   unset options  # Ensure the array is cleared before use
   declare -a options  # Explicitly declare an indexed array
@@ -44,30 +42,46 @@ rl() {
   index=1
   for script in "${RUN_LOCAL_SCRIPTS[@]}"; do
     dir_name=$(dirname "$script")
-    printf "\033[38;5;73m%s)\033[0m %s\n" "$index" "$dir_name"
+    display_name=$(echo "$dir_name" | sed "s|$RL_DEV_FOLDER/||")
+    printf "\033[38;5;73m%s)\033[0m %s\n" "$index" "$display_name"
     options+=("$dir_name")
     ((index++))
   done
-
-  echo ""
-  PS3="Select a run-local script to execute: "
 
   # Make sure `select` works in both Bash & Zsh
   if [ -n "$ZSH_VERSION" ]; then
     setopt no_nomatch  # Prevent issues with array expansion
   fi
 
-  select opt in "${options[@]}"; do
-    if [[ -n "$opt" ]]; then
-      # Change to the directory containing the selected script and execute it
-      cd "$opt" || return
-      ./run-local "$@"
-      break
-    else
-      echo "Invalid selection. Please try again."
-    fi
-  done
+  printf "\nSelect a run-local script to execute: "
+  read -r choice
+  # Prompt the user to type a number eg. 1, 2, 3, etc. DO not use select
 
+  # Check if the choice is a number - the length of the files
+  if [[ $choice =~ ^[0-9]+$ ]]; then
+    # Check if the choice is within the range of the files
+    if [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
+      # Execute the selected run-local script
+      printf "\n=== \033[38;5;73m%s\033[0m:\n" "Changing to ${options[choice]}"
+      cd "${options[choice]}/" || (echo "Error: Could not change to the directory." && return)
+      rl_cd "$@" || rl "$@"
+    else
+      echo "Invalid choice. Please select a number between 1 and ${#options[@]}."
+    fi
+  else
+    echo "Invalid choice. Please select a number between 1 and ${#options[@]}."
+  fi
+
+}
+
+# if `rl cd`, we need just cd into the directory after finding the path
+function rl_cd() {
+  # if $1 is cd, and $2 arg is a directory, cd into it
+  if [ "$1" = "cd" ] && [ -d "$2" ]; then
+    cd "$2" || (echo "Error: Could not change to the directory." && return)
+    return 0
+  fi
+  return 1
 }
 
 # Add the alias to the shell configuration

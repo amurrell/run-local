@@ -16,9 +16,20 @@
 
 # Save the initial directory where the script was executed
 INITIAL_DIR=$(pwd)
+NEW_DIR=""
+
+# shellcheck disable=SC2317
+dir_trap() {
+  if [ -n "$NEW_DIR" ]; then
+    cd "$NEW_DIR" || exit 1
+  else
+    # Ensure we return to the initial directory upon exit
+    cd "$INITIAL_DIR" || exit 1
+  fi
+}
 
 # Ensure we return to the initial directory upon exit
-trap 'cd "$INITIAL_DIR"' EXIT
+trap dir_trap EXIT
 
 # Run Local Vars
 RL_VARS_FILE_NAME="rl-vars"
@@ -167,6 +178,16 @@ if check_file "$REPO_ROOT/$RL_EXTENDED_FILE_NAME"; then
   source "$REPO_ROOT/$RL_EXTENDED_FILE_NAME"
 fi
 
+# check alias
+check_alias() {
+  # it's not perfect, but its fast.
+  # to check with subshells of zsh and bash interactive is too time consuming
+  if [ -f "$REPO_ROOT/$RL_ALIAS_FILE_NAME" ]; then
+    return 0
+  fi
+  return 1
+}
+
 # Function to display menu options
 show_menu() {
 
@@ -219,6 +240,9 @@ show_menu() {
   pretty_option "11)" "dl" "             · Runs gitsubmodule update (pulls DockerLocal at ref)"
   pretty_option "11a)" "dl-main" "           · Checkout DockerLocal on main (to update it)"
   pretty_option "12)" "help" "           · Show this help menu"
+  pretty_option "13)" "list" "           · List all available run-local scripts in RL_DEV_FOLDER"
+  # check we have rl alias with `alias rl`
+  check_alias && pretty_option "14)" "cd" "             · Intended for using 'rl cd path/in/repo' when outside your project"
   echo ""
   echo " Running Project: $(color_text primary "$PROJECT_NAME")"
   echo " Running on Port: $(color_text primary "$PORT")"
@@ -251,6 +275,8 @@ show_menu() {
     11) ./run-local dl ;;
     11a) ./run-local dl-main ;;
     12) show_menu ;;
+    13) ./run-local list ;;
+    14) ./run-local cd ;;
     *)
       if check_function 'handle_rl_extended_choice'; then
         handle_rl_extended_choice "$choice"
@@ -297,7 +323,7 @@ dl() {
         ;;
     esac
   fi
-  step_text "☑️ DockerLocal initialized."
+  step_text "☑️  DockerLocal initialized."
 }
 
 # Check if rl alias exists with 'alias rl'
@@ -306,27 +332,33 @@ setup_alias() {
     SHELL_PROFILES=()
     DETECT_DEV_FOLDER=$(dirname "$INITIAL_DIR")
 
-    # check for alias in zsh
-    if zsh -i -c 'alias rl' 2>/dev/null; then
+    # if no alias in zsh, add to shell profiles to add
+    if ! zsh -i -c 'alias rl' &> /dev/null; then
       SHELL_PROFILES+=("$HOME/.zshrc")
     fi
 
-    # check for alias in bash
-    if bash -i -c 'alias rl' 2>/dev/null; then
+    # if no alias in bash, add to shell profiles to add
+    if ! bash -i -c 'alias rl' &> /dev/null; then
       SHELL_PROFILES+=("$HOME/.bashrc")
     fi
 
     # if symlink does not exist, create it.
     if [ ! -L "$DETECT_DEV_FOLDER/$RL_ALIAS_FILE_NAME" ]; then
       step_text "Creating symlink to $RL_ALIAS_FILE_NAME in $DETECT_DEV_FOLDER"
-      ln -s "$DETECT_DEV_FOLDER/$RL_ALIAS_FILE_NAME" "$DETECT_DEV_FOLDER/$RL_ALIAS_FILE_NAME"
+      ln -s "$REPO_ROOT/$RL_ALIAS_FILE_NAME" "$DETECT_DEV_FOLDER/$RL_ALIAS_FILE_NAME"
+    fi
+
+    # if length of shell profiles is 0, return
+    if [ ${#SHELL_PROFILES[@]} -eq 0 ]; then
+      return
     fi
 
     # for each shell profile that is found
     for SHELL_PROFILE_FILE in "${SHELL_PROFILES[@]}"; do
+      step_text "Checking $SHELL_PROFILE_FILE exists?"
       if [ -f "$SHELL_PROFILE_FILE" ]; then
         step_text "Found $SHELL_PROFILE_FILE - adding alias to it."
-        step_text "Source it, or open new terminal to use 'rl' alias."
+        step_text "👉 Source it, or open new terminal to use 'rl' alias."
         {
           echo ""
           echo "# Run Local Alias"
@@ -763,8 +795,21 @@ db_remove() {
   fi
 
   # Step 4: Re-run the install process
-  step_text "Re-running the install process..."
-  ./run-local install
+  # prompt to ask if they want to re-install
+  read -rp "Do you want to re-install the site? (Y/N): " RESPONSE
+  case $RESPONSE in
+    [Nn]*)
+      echo "=== ❌ Operation canceled. Run 'install' to re-install the site."
+      exit 0
+      ;;
+    [Yy]*)
+      ./run-local install
+      ;;
+    *)
+      echo "Invalid response. Operation canceled."
+      exit 1
+      ;;
+  esac
 }
 
 run_npm_command() {
@@ -927,6 +972,34 @@ case $1 in
     ;;
   help)
     show_menu
+    exit 0
+    ;;
+  list)
+    # check alias is installed (using alias) requirement for rl list
+    if ! alias rl &> /dev/null; then
+      step_text "Cannot list without alias 'rl', and it is not installed."
+      step_text "👉 Please run './run-local' again and watch for alias info, or manually install it."
+      exit 1
+    fi
+    # if we go 1 layer out, it will force rl alias
+    (cd ../  && rl)
+    exit $?
+    ;;
+  cd)
+    step_text "Changing directory to (show all args) ${*:2}"
+    # change directory - falls back on trap (initial dir if not set)
+    if [ -n "$2" ]; then
+      echo "Changing directory to $REPO_ROOT/$2"
+      if [ -d "$REPO_ROOT/$2" ]; then
+        # set NEW_DIR to the new directory - this will make sure we go there
+        echo "Setting NEW_DIR to $REPO_ROOT/$2"
+        NEW_DIR="$REPO_ROOT/$2"
+        exit 0
+      else
+        step_text "❌ Error: Directory '$2' not found in the repository."
+        exit 1
+      fi
+    fi
     exit 0
     ;;
   *)

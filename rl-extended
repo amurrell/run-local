@@ -16,24 +16,22 @@ fi
 show_help_extended() {
   color_text faint "RL-Extended (Custom) Commands: "
   echo ""
-  pretty_option "$(color_text primary "e1)")"  "list              " "· List all available rl sites in RL_DEV_FOLDER"
-  pretty_option "$(color_text primary "e2)")"  "post-install      " "· Run post-install commands"
-  pretty_option "$(color_text primary "e3)")"  "artisan           " "· Run an Artisan command"
-  pretty_option "$(color_text primary "e4)")"  "debug-artisan     " "· Run an Artisan command with Xdebug enabled"
-  pretty_option "$(color_text primary "e5)")"  "tinker            " "· Run Tinker (Laravel REPL)"
-  pretty_option "$(color_text primary "e6)")"  "debug-tinker      " "· Run Tinker with Xdebug enabled"
-  pretty_option "$(color_text primary "e7)")"  "assets            " "· Download, upload, swap assets - (checks $DATA_DIR for .tar.gz files)"
+  pretty_option "$(color_text primary "e1)")"  "post-install      " "· Run post-install commands"
+  pretty_option "$(color_text primary "e2)")"  "artisan           " "· Run an Artisan command"
+  pretty_option "$(color_text primary "e3)")"  "debug-artisan     " "· Run an Artisan command with Xdebug enabled"
+  pretty_option "$(color_text primary "e4)")"  "tinker            " "· Run Tinker (Laravel REPL)"
+  pretty_option "$(color_text primary "e5)")"  "debug-tinker      " "· Run Tinker with Xdebug enabled"
+  pretty_option "$(color_text primary "e6)")"  "assets            " "· Download, upload, swap assets - (checks $DATA_DIR for .tar.gz files)"
 }
 
 handle_rl_extended_choice() {
   case $1 in
-    e1) ./run-local list ;;
-    e2) ./run-local post-install ;;
-    e3) ./run-local artisan ;;
-    e4) ./run-local debug-artisan ;;
-    e5) ./run-local tinker ;;
-    e6) ./run-local debug-tinker ;;
-    e7) ./run-local assets ;;
+    e1) ./run-local post-install ;;
+    e2) ./run-local artisan ;;
+    e3) ./run-local debug-artisan ;;
+    e4) ./run-local tinker ;;
+    e5) ./run-local debug-tinker ;;
+    e6) ./run-local assets ;;
     *)
       step_text "No (valid) $1 option chosen... Quitting."
       exit 0
@@ -43,16 +41,6 @@ handle_rl_extended_choice() {
 handle_rl_extended() {
   # Determine the script to run based on the first argument
   case $1 in
-    list)
-      # check alias is installed (using alias) requirement for rl list
-      if ! alias rl &> /dev/null; then
-        echo "Alias 'rl' is not installed. Please run 'rl install' to install it."
-        exit 1
-      fi
-      # if we go 1 layer out, it will force rl alias
-      (cd ../  && rl)
-      exit $?
-      ;;
     post-install)
       post_install
       exit $?
