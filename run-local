@@ -117,6 +117,11 @@ color_text() {
       # soft-purple
       color="38;5;132"
       ;;
+    disabled)
+      # muted \e[38;5;59m
+      color="38;5;60"
+      #color="38;5;241"
+      ;;
   esac
 
   echo -e "\033[${color}m${text}\033[0m"
@@ -180,8 +185,15 @@ fi
 
 # check alias
 check_alias() {
-  # it's not perfect, but its fast.
-  # to check with subshells of zsh and bash interactive is too time consuming
+
+  # the alias is used, it exports this var
+  # - but we could be using ./run-local and still have it
+  if [ -n "$USING_RL_ALIAS" ]; then
+    return 0
+  fi
+
+  # checking zsh/bash -i subshells is too time-consuming
+  # so we'll just check if the file exists
   if [ -f "$REPO_ROOT/$RL_ALIAS_FILE_NAME" ]; then
     return 0
   fi
@@ -190,7 +202,7 @@ check_alias() {
 
 # Function to display menu options
 show_menu() {
-
+  local self_command=$SELF_COMMAND
   EXTRA_MENU_OPTIONS=""
   if [ -n "$RL_EXTENDED_FILE_NAME" ]; then
     EXTRA_MENU_OPTIONS=""
@@ -198,24 +210,23 @@ show_menu() {
     check_function show_help_extended && EXTRA_MENU_OPTIONS+="$(show_help_extended)"
   fi
 
+  check_alias && self_command='rl'
+
   echo ""
   step_text "🧃 $(color_text secondary "Welcome to the run-local script!")"
   echo ""
   echo " Usage: "
-  pretty_option "$SELF_COMMAND" "<command>" "[options]"
+  pretty_option "$self_command" "<command>" "[options]"
   echo ""
   echo " Examples: "
-  pretty_option " $SELF_COMMAND" "up"
-  pretty_option " $SELF_COMMAND" "down"
-  pretty_option " $SELF_COMMAND" "install"
-  pretty_option " $SELF_COMMAND" "npm run hot"
-  pretty_option " $SELF_COMMAND" "ssh"
-  pretty_option " $SELF_COMMAND" "logs"
-  pretty_option " $SELF_COMMAND" "db"
-  pretty_option " $SELF_COMMAND" "db-query \"show tables;\""
-  echo ""
-  echo "Commands & Interactive Prompt: $EXTRA_MENU_OPTIONS"
-  echo ""
+  pretty_option " $self_command" "up"
+  pretty_option " $self_command" "down"
+  pretty_option " $self_command" "install"
+  pretty_option " $self_command" "npm run hot"
+  pretty_option " $self_command" "ssh"
+  pretty_option " $self_command" "logs"
+  pretty_option " $self_command" "db"
+  pretty_option " $self_command" "db-query \"show tables;\""
   printf "   \n🧐 Is this your first run? Run %s to install!\n\n" "$(color_text "primary" "10")"
   pretty_option "1)" "up" "              · Start the site"
   pretty_option "2)" "down" "            · Stop the site"
@@ -244,11 +255,13 @@ show_menu() {
   # check we have rl alias with `alias rl`
   check_alias && pretty_option "14)" "cd" "             · Intended for using 'rl cd path/in/repo' when outside your project"
   echo ""
+  echo "Commands & Interactive Prompt: $EXTRA_MENU_OPTIONS"
+  echo ""
   echo " Running Project: $(color_text primary "$PROJECT_NAME")"
   echo " Running on Port: $(color_text primary "$PORT")"
   echo " Using Database: $(color_text primary "$DB_NAME")"
   echo ""
-  read -rp "Enter the number (and letter if applicable) of the command you'd like to execute (enter to quit): " choice
+  read -rp "Enter option to execute (enter to quit): " choice
 
   case $choice in
     1) ./run-local up ;;
@@ -1003,6 +1016,7 @@ case $1 in
     exit 0
     ;;
   *)
+    echo "Checking for extended command..."
     if check_function 'handle_rl_extended'; then
       step_text "Running extended command: $1 ${#:2}"
       handle_rl_extended "$1" "${@:2}"

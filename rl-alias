@@ -4,6 +4,8 @@ RL_DEV_FOLDER="${HOME}/code"
 
 # Define the alias function
 rl() {
+  USING_RL_ALIAS=true
+  export USING_RL_ALIAS
   # Check if the current directory has a run-local script
   if [ -f "run-local" ]; then
     printf "\n=== \033[38;5;73m%s\033[0m:\n" "Found ./run-local - Running..."

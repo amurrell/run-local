@@ -138,20 +138,36 @@ To **add run-local as your local development tool**, follow these steps as a 1-t
 
    ***
 
-1. Copy [README-TEMPLATE](./README-TEMPLATE.md) or relevant parts to your Project's README. This is how others will **setup their local development** with run-local once it's committed to your project, with your own `rl-vars`, `rl-extended`, and `rl-funcs`.
+1. Download [README-TEMPLATE](./README-TEMPLATE.md) or copy relevant parts to your Project's README. This is how others will **setup their local development** with run-local once it's committed to your project, with your own `rl-vars`, `rl-extended`, and `rl-funcs`.
+
+   ```
+   wget https://raw.githubusercontent.com/amurrell/run-local/main/README-TEMPLATE.md && mv README-TEMPLATE.md README.md
+   ```
+
+   <details>
+      <summary>See: Curl</summary>
+
+   ```bash
+   curl -O https://raw.githubusercontent.com/amurrell/run-local/main/README-TEMPLATE.md && mv README-TEMPLATE.md README.md
+   ```
+
+   </details>
+
+   ***
 
 1. Consider adding `rl-extended` and `rl-funcs` functions for your project, changing however you need, adding only relevant ones, your making your own, based on these.
 
    ```bash
-   # Core Customization Files
+   # Core
    # rl-extended
    wget https://raw.githubusercontent.com/amurrell/run-local/main/rl-extended && chmod +x rl-extended
-   # rl-post-install
-   wget https://raw.githubusercontent.com/amurrell/run-local/main/rl-post-install && chmod +x rl-post-install
-
-   # More specific customizations
-   # composer
+   # rl-funcs
    mkdir -p rl-funcs && cd rl-funcs
+
+   # RL funcs
+   # rl-post-install
+   wget https://raw.githubusercontent.com/amurrell/run-local/main/rl-funcs/rl-post-install && chmod +x rl-post-install
+   # composer
    wget https://raw.githubusercontent.com/amurrell/run-local/main/rl-funcs/rl-composer && chmod +x rl-composer
    # artisan (Laravel)
    wget https://raw.githubusercontent.com/amurrell/run-local/main/rl-funcs/rl-artisan && chmod +x rl-artisan
@@ -161,15 +177,16 @@ To **add run-local as your local development tool**, follow these steps as a 1-t
       <summary>See: Curl</summary>
 
    ```bash
-   # Core Customization Files
+   # Core
    # rl-extended
    curl -O https://raw.githubusercontent.com/amurrell/run-local/main/rl-extended && chmod +x rl-extended
-   # rl-post-install
-   wget https://raw.githubusercontent.com/amurrell/run-local/main/rl-post-install && chmod +x rl-post-install
-
-   # More specific customizations
-   # composer
+   # rl-funcs
    mkdir -p rl-funcs && cd rl-funcs
+
+   # RL funcs
+   # rl-post-install
+   curl -O https://raw.githubusercontent.com/amurrell/run-local/main/rl-funcs/rl-post-install && chmod +x rl-post-install
+   # composer
    curl -O https://raw.githubusercontent.com/amurrell/run-local/main/rl-funcs/rl-composer && chmod +x rl-composer
    # artisan (Laravel)
    curl -O https://raw.githubusercontent.com/amurrell/run-local/main/rl-funcs/rl-artisan && chmod +x rl-artisan
@@ -188,25 +205,51 @@ To **add run-local as your local development tool**, follow these steps as a 1-t
 
    ```bash
    # Comment out or remove any functions you don't need, and renumber the list
-   show_help_extended()...
-
-   handle_rl_extended_choice() {
-   case $1 in
-      e1) ./run-local list ;;
-      e2) ./run-local post-install ;;
-      e3) ./run-local artisan ;;
-      e4) ./run-local debug-artisan ;;
-      e5) ./run-local tinker ;;
-      e6) ./run-local debug-tinker ;;
-      e7) ./run-local assets ;;
-      *)
-         step_text "No (valid) $1 option chosen... Quitting."
-         exit 0
-   esac
+   show_help_extended() {
+      color_text faint "RL-Extended (Custom) Commands: "
+      echo ""
+      # the $check vs $command is for the file it comes from, eg. check "artisan" to get both artisan and debug-artisan commands
+      make_extended_option "post-install" "post-install   " "· Run post-install commands"
+      make_extended_option "artisan"      "artisan        " "· Run an Artisan command"
+      make_extended_option "artisan"      "debug-artisan  " "· Run an Artisan command with Xdebug enabled"
+      make_extended_option "tinker"       "tinker         " "· Run Tinker (Laravel REPL)"
+      make_extended_option "tinker"       "debug-tinker   " "· Run Tinker with Xdebug enabled"
+      make_extended_option "assets"       "assets         " "· Download, upload, swap assets - (checks $(basename "$DATA_DIR") for .tar.gz files)"
+      echo ""
    }
 
-   # Edit options in
-   handle_rl_extended()...
+   handle_rl_extended() {
+      # Determine the script to run based on the first argument
+      case $1 in
+         post-install)
+            post_install
+            exit $?
+            ;;
+         artisan)
+            prompt_artisan_command "$@"
+            # need everything after the first argument (eg. route:list)
+            run_artisan_command "${*:2}"
+            exit 0
+            ;;
+         debug-artisan)
+            prompt_artisan_command "$@"
+            run_debug_artisan_command "${*:2}"
+            exit 0
+            ;;
+         tinker)
+            run_tinker_command
+            exit 0
+            ;;
+         debug-tinker)
+            run_debug_tinker_command
+            exit 0
+            ;;
+         *)
+            echo "Unknown (extended) command: $1"
+            exit 1
+            ;;
+      esac
+   }
    ```
 
    </details>

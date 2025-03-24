@@ -13,29 +13,56 @@ if [ -d "$REPO_ROOT/$RL_FUNC_FOLDER" ]; then
   done
 fi
 
+# keep track of the extended commands for length
+EXTENDED_COMMANDS=()
+
+# see if rl-<$1> exists in rl-funcs/ folder, primary or disabled
+get_extended_option_color() {
+  local color='disabled'
+  [ -f "$REPO_ROOT/$RL_FUNC_FOLDER/rl-$1" ] && color='primary'
+  echo "$color"
+}
+
+make_extended_option(){
+  local check=$1
+  local command=$2
+  local description=$3
+  local color
+  local trimmed_command
+  color=$(get_extended_option_color "$check")
+  #index is the length of the array
+  index=${#EXTENDED_COMMANDS[@]} # Zero-based index
+  index=$((index + 1)) # One-based index
+  trimmed_command=$(echo "$command" | xargs) # Trim leading/trailing whitespace
+  # if color==disabled, append -disabled to the command
+  if [ "$color" == "disabled" ]; then
+    trimmed_command="$trimmed_command [disabled]"
+    description="· Add rl-funcs/rl-$check to enable"
+  fi
+  EXTENDED_COMMANDS+=("$trimmed_command")
+  # Adjust the displayed index to be one-based (index + 1)
+  #pretty_option "$(color_text "$color" "e$index)")" "$command" "$description"
+
+  # if color == disabled, use color_text with each one to make it disabled
+  # do not use pretty option
+  if [ "$color" == "disabled" ]; then
+    pretty_option "$(color_text disabled "e$index) $command $description" disabled)"
+  else
+    pretty_option "$(color_text "$color" "e$index)")" "$command" "$description"
+  fi
+}
+
 show_help_extended() {
   color_text faint "RL-Extended (Custom) Commands: "
   echo ""
-  pretty_option "$(color_text primary "e1)")"  "post-install      " "· Run post-install commands"
-  pretty_option "$(color_text primary "e2)")"  "artisan           " "· Run an Artisan command"
-  pretty_option "$(color_text primary "e3)")"  "debug-artisan     " "· Run an Artisan command with Xdebug enabled"
-  pretty_option "$(color_text primary "e4)")"  "tinker            " "· Run Tinker (Laravel REPL)"
-  pretty_option "$(color_text primary "e5)")"  "debug-tinker      " "· Run Tinker with Xdebug enabled"
-  pretty_option "$(color_text primary "e6)")"  "assets            " "· Download, upload, swap assets - (checks $DATA_DIR for .tar.gz files)"
-}
-
-handle_rl_extended_choice() {
-  case $1 in
-    e1) ./run-local post-install ;;
-    e2) ./run-local artisan ;;
-    e3) ./run-local debug-artisan ;;
-    e4) ./run-local tinker ;;
-    e5) ./run-local debug-tinker ;;
-    e6) ./run-local assets ;;
-    *)
-      step_text "No (valid) $1 option chosen... Quitting."
-      exit 0
-  esac
+  # the $check vs $command is for the file it comes from, eg. check "artisan" to get both artisan and debug-artisan commands
+  make_extended_option "post-install" "post-install   " "· Run post-install commands"
+  make_extended_option "artisan"      "artisan        " "· Run an Artisan command"
+  make_extended_option "artisan"      "debug-artisan  " "· Run an Artisan command with Xdebug enabled"
+  make_extended_option "tinker"       "tinker         " "· Run Tinker (Laravel REPL)"
+  make_extended_option "tinker"       "debug-tinker   " "· Run Tinker with Xdebug enabled"
+  make_extended_option "assets"       "assets         " "· Download, upload, swap assets - (checks $DATA_DIR for .tar.gz files)"
+  echo ""
 }
 
 handle_rl_extended() {
@@ -65,8 +92,51 @@ handle_rl_extended() {
       exit 0
       ;;
     *)
-      echo "Unknown command: $1"
+      echo "Unknown (extended) command: $1"
       exit 1
       ;;
   esac
+}
+
+
+handle_rl_extended_choice() {
+  local choice_index=${1#e} # Extract the index from eX (e.g., e1 -> 1)
+
+  # if the choice is enter, then gracefull exit
+  if [ -z "$choice_index" ]; then
+    step_text "No option chosen... Quitting."
+    exit 0
+  fi
+
+  # Debugging: Ensure choice_index is numeric
+  if ! [[ $choice_index =~ ^[0-9]+$ ]]; then
+    step_text "Invalid choice format. Expected format: eX (e.g. 1, 2, e1, e2)."
+    exit 1
+  fi
+
+  # Convert to zero-based index for array access
+  local array_index=$((choice_index - 1))
+
+  # need to load the extended commands if not already loaded
+  if [ ${#EXTENDED_COMMANDS[@]} -eq 0 ]; then
+    # this will load the extended commands
+    show_help_extended > /dev/null
+  fi
+
+  # Check if the index is within bounds
+  if [[ $array_index -ge 0 && $array_index -lt ${#EXTENDED_COMMANDS[@]} ]]; then
+    local command=${EXTENDED_COMMANDS[$array_index]}
+
+    # disabled
+    if [[ $command == *"[disabled]"* ]]; then
+      step_text "Command is disabled. Enable it in rl-funcs/ folder."
+      exit 0
+    fi
+
+    step_text "Executing command: $command" # Debugging: Show the command being executed
+    ./run-local "$command"
+  else
+    step_text "No (valid) $1 option chosen... Quitting."
+    exit 0
+  fi
 }
