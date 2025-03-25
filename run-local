@@ -1028,7 +1028,15 @@ case $1 in
     exit 0
     ;;
   dl-main)
-    (cd "$REPO_ROOT/DockerLocal" && git checkout main && cd "$REPO_ROOT" || step_text "❌ Error: Could not checkout main branch.")
+    step_text "Updating DockerLocal..."
+    cd "$REPO_ROOT/DockerLocal" || (echo "❌ Error: Could not change to DockerLocal directory." && exit 1)
+    step_text "Checking out main branch..."
+    git checkout main || (step_text "❌ Error: Could not checkout main branch." && exit 1)
+    step_text "Pulling latest changes..."
+    git pull || (step_text "❌ Error: Could not pull latest changes." && exit 1)
+    step_text "Updating submodules..."
+    git submodule update --init --recursive || (step_text "❌ Error: Could not update submodules." && exit 1)
+    step_text "✅ DockerLocal updated successfully."
     exit 0
     ;;
   help)
@@ -1037,13 +1045,14 @@ case $1 in
     ;;
   list)
     # check alias is installed (using alias) requirement for rl list
-    if ! alias rl &> /dev/null; then
+    if ! check_alias true; then
       step_text "Cannot list without alias 'rl', and it is not installed."
       step_text "👉 Please run './run-local' again and watch for alias info, or manually install it."
       exit 1
     fi
     # if we go 1 layer out, it will force rl alias
-    (cd ../  && rl)
+    # need to do interatively so we can use the alias
+    $SHELL -i -c "cd ../ && rl"
     exit $?
     ;;
   cd)

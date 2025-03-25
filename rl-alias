@@ -65,7 +65,17 @@ rl() {
     if [ "$choice" -ge 1 ] && [ "$choice" -le "${#options[@]}" ]; then
       # Execute the selected run-local script
       printf "\n=== \033[38;5;73m%s\033[0m:\n" "Changing to ${options[choice]}"
-      cd "${options[choice]}/" || (echo "Error: Could not change to the directory." && return)
+
+      # Normalize index for Bash (0-based) vs Zsh (1-based)
+      if [ -n "$BASH_VERSION" ]; then
+        selected_index=$((choice - 1))
+      else
+        selected_index=$choice
+      fi
+
+      cd "${options[selected_index]}/" || (echo "Error: Could not change to the directory." && return)
+
+
       rl_cd "$@" || rl "$@"
     else
       echo "Invalid choice. Please select a number between 1 and ${#options[@]}."
