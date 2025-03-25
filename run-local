@@ -469,14 +469,24 @@ install_modify_nginx_step() {
   # We need to cp DOCKERFILE_TEMPLATE to CUSTOM_DOCKERFILE_TEMPLATE and replace line "# Remove pool.d/www.conf" with DOCKERFILE_CUSTOM_CONF block
   cp "$DOCKERFILE_TEMPLATE_FILE" "$CUSTOM_DOCKERFILE_TEMPLATE"
 
-  # Replace line is like: "# Remove pool.d/www.conf" - need to escpae it
-  DOCKERFILE_REPLACE_LINE=$(echo "$DOCKERFILE_REPLACE_LINE" | sed 's/[^^]/[&]/g; s/\^/\\^/g')
+  # Write the multiline replacement to a temp file
+  CUSTOM_CONF_FILE=$(mktemp)
+  printf '%s\n' "$DOCKERFILE_CUSTOM_CONF" > "$CUSTOM_CONF_FILE"
 
-  # use sed for linux, wsl, and mac (bak) - need to replace the line with a block of text
-  sed -i.bak "/$DOCKERFILE_REPLACE_LINE/c\\$DOCKERFILE_CUSTOM_CONF" "$CUSTOM_DOCKERFILE_TEMPLATE"
+  REPLACED=0
+  {
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ $REPLACED -eq 0 && "$line" == *"$DOCKERFILE_REPLACE_LINE"* ]]; then
+        cat "$CUSTOM_CONF_FILE"
+        REPLACED=1
+      else
+        printf '%s\n' "$line"
+      fi
+    done < "$DOCKERFILE_TEMPLATE_FILE"
+  } > "$CUSTOM_DOCKERFILE_TEMPLATE"
 
-  # remove the backup file
-  rm "$CUSTOM_DOCKERFILE_TEMPLATE.bak"
+  rm "$CUSTOM_CONF_FILE"
+
   step_text "Custom Dockerfile created at $CUSTOM_DOCKERFILE_TEMPLATE."
 }
 

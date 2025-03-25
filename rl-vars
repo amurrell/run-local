@@ -39,7 +39,8 @@ APP_ENV_EXAMPLE_FILE="$REPO_ROOT/.env.example"
 # `
 # `# Remove pool.d/www.conf
 # ```
-DOCKERFILE_CUSTOM_CONF=$(cat <<EOF
+# Using this syntax to maintain newlines in the variable
+read -r -d '' DOCKERFILE_CUSTOM_CONF <<'EOF'
 # change upload_max, post max, memory limit
 RUN sed -i "/;upload_max_filesize = .*/c\upload_max_filesize = 20M" /etc/php/PHP_VERSION/fpm/php.ini && \
 	sed -i "/upload_max_filesize = .*/c\upload_max_filesize = 20M" /etc/php/PHP_VERSION/fpm/php.ini && \
@@ -49,8 +50,8 @@ RUN sed -i "/;upload_max_filesize = .*/c\upload_max_filesize = 20M" /etc/php/PHP
 	sed -i "/memory_limit = .*/c\memory_limit = 256M" /etc/php/PHP_VERSION/fpm/php.ini
 
 # Remove pool.d/www.conf
+RUN rm /etc/php/PHP_VERSION/fpm/pool.d/www.conf
 EOF
-)
 DOCKERFILE_REPLACE_LINE="Remove pool.d/www.conf"
 
 # rl-extended and rl-funcs variables
