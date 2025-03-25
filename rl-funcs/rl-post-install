@@ -4,9 +4,9 @@ post_install() {
   # Example of post-install, to put custom things like composer, artisan migrate, etc
   step_text "Running rl-extended post-install command"
 
-  # Laravel specific
-  step_text "Running Laravel specific post-install commands"
-  laravel_post_install
+  # Laravel specific (Example)
+  #step_text "Running Laravel specific post-install commands"
+  #laravel_post_install
 
   # Run npm
   step_text "Running npm install and $DEFAULT_NPM_COMMAND"

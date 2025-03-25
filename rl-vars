@@ -50,9 +50,8 @@ RUN sed -i "/;upload_max_filesize = .*/c\upload_max_filesize = 20M" /etc/php/PHP
 	sed -i "/memory_limit = .*/c\memory_limit = 256M" /etc/php/PHP_VERSION/fpm/php.ini
 
 # Remove pool.d/www.conf
-RUN rm /etc/php/PHP_VERSION/fpm/pool.d/www.conf
 EOF
-DOCKERFILE_REPLACE_LINE="Remove pool.d/www.conf"
+DOCKERFILE_REPLACE_LINE="# Remove pool.d/www.conf"
 
 # rl-extended and rl-funcs variables
 

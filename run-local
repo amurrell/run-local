@@ -185,11 +185,17 @@ fi
 
 # check alias
 check_alias() {
+  local strict=${1:-false}
+  # if we are using the alias, return true
 
   # the alias is used, it exports this var
   # - but we could be using ./run-local and still have it
   if [ -n "$USING_RL_ALIAS" ]; then
     return 0
+  fi
+
+  if [ "$strict" = true ]; then
+    return 1
   fi
 
   # checking zsh/bash -i subshells is too time-consuming
@@ -341,6 +347,10 @@ dl() {
 
 # Check if rl alias exists with 'alias rl'
 setup_alias() {
+  if check_alias true; then
+    return
+  fi
+
   if check_file "$REPO_ROOT/$RL_ALIAS_FILE_NAME"; then
     SHELL_PROFILES=()
     DETECT_DEV_FOLDER=$(dirname "$INITIAL_DIR")
@@ -355,15 +365,15 @@ setup_alias() {
       SHELL_PROFILES+=("$HOME/.bashrc")
     fi
 
+    # if length of shell profiles is 0, return
+    if [ ${#SHELL_PROFILES[@]} -eq 0 ]; then
+      return
+    fi
+
     # if symlink does not exist, create it.
     if [ ! -L "$DETECT_DEV_FOLDER/$RL_ALIAS_FILE_NAME" ]; then
       step_text "Creating symlink to $RL_ALIAS_FILE_NAME in $DETECT_DEV_FOLDER"
       ln -s "$REPO_ROOT/$RL_ALIAS_FILE_NAME" "$DETECT_DEV_FOLDER/$RL_ALIAS_FILE_NAME"
-    fi
-
-    # if length of shell profiles is 0, return
-    if [ ${#SHELL_PROFILES[@]} -eq 0 ]; then
-      return
     fi
 
     # for each shell profile that is found
@@ -560,7 +570,7 @@ install_setup_env_file() {
 
   # Check if the env example file exists - but it was set
   if [ ! -f "$env_file_example" ]; then
-    step_text "❌ Error: $type env example file '$env_file_example' does not exist."
+    step_text "❌ Error: $type env example file '$env_file_example' does not exist. Clear the variable in rl-vars if you don't need it & re-run."
     exit 1
   fi
 
@@ -585,6 +595,10 @@ install_site_up_step() {
   # do not try to pass this -c= if we have a DockerLocal/database file
   if [ -f "$DB_NAME_FILE" ]; then
     (cd "$COMMANDS_DIR" && ./site-up)
+    # if we do ./run-local db-list and dont see DB_FILE_NAME contents (db name), then ./site-up -c
+    if ! ./run-local db-list | grep -q "$DB_NAME"; then
+      (cd "$COMMANDS_DIR" && ./site-up -c="$DB_NAME")
+    fi
   else
     # if we don't have one, use default
     (cd "$COMMANDS_DIR" && ./site-up -c="$DEFAULT_DB_NAME")
@@ -851,11 +865,35 @@ run_npm_command() {
 
   # Change to the app directory (where the package.json is located)
   # check if APP_PATH/package.json exists
+
+  # if APP_PATH is empty, then its the same as $REPO_ROOT
+  if [ -z "$APP_PATH" ]; then
+    APP_PATH="$REPO_ROOT"
+  fi
+
   if [ -f "$APP_PATH/package.json" ]; then
     cd "$APP_PATH" || exit 1
   else
     step_text "❌ Error: No package.json found in $APP_PATH. Please ensure the path is correct in $APP_PATH_FILE."
-    exit 1
+
+    # prompt to ask if they want to nvm use && npm init
+    step_text "Current Directory is: $(pwd)"
+    read -rp "Do you want to run 'nvm use' and 'npm init' (creates a package.json) in the current directory? (Y/N): " RESPONSE
+    case $RESPONSE in
+      [Nn]*)
+        echo "=== ❌ Operation canceled. Run 'install' to re-install the site."
+        exit 0
+        ;;
+      [Yy]*)
+        step_text "Running 'nvm use' and 'npm init'..."
+        nvm use
+        npm init -y
+        ;;
+      *)
+        echo "Invalid response. Operation canceled."
+        exit 1
+        ;;
+    esac
   fi
 
   nvm install "$(<"$NVM_VERSION_FILE")" && nvm use
