@@ -616,9 +616,21 @@ install_detect_no_import_sql() {
   # that the db-import of the install appears done, if want to redo it, run db-remove and then run install again
   if [ -n "$SQL_FILE" ] && [ -f "$MY_CNF_FILE" ]; then
     step_text "☑️ Database import process appears to be done. If you want to redo it, run 'db-remove' and then run 'install' again."
+
+    # do another check - see if doing ./run-local db-query "show tables;" returns anything
+    # if it does, then we have a db and we don't need to import
+    if ! ./run-local db-query "show tables;" false | grep -q "Tables_in_$DB_NAME"; then
+      # do a db-import
+      step_text "No tables found in database '$DB_NAME'."
+      step_text "Proceeding with more manual database import..."
+      SQL_FILE_BASENAME=$(basename "$SQL_FILE")
+      db_import "$SQL_FILE_BASENAME"
+    fi
+
     # make SQL_FILE empty so it doesn't try to import again.
     SQL_FILE=""
   fi
+
 }
 
 # Function to import SQL file for setup

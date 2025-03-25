@@ -41,7 +41,6 @@ make_extended_option(){
   fi
   EXTENDED_COMMANDS+=("$trimmed_command")
   # Adjust the displayed index to be one-based (index + 1)
-  #pretty_option "$(color_text "$color" "e$index)")" "$command" "$description"
 
   # if color == disabled, use color_text with each one to make it disabled
   # do not use pretty option
@@ -57,10 +56,11 @@ show_help_extended() {
   echo ""
   # the $check vs $command is for the file it comes from, eg. check "artisan" to get both artisan and debug-artisan commands
   make_extended_option "post-install" "post-install   " "· Run post-install commands"
+  make_extended_option "composer"     "composer       " "· Run a Composer command"
   make_extended_option "artisan"      "artisan        " "· Run an Artisan command"
-  make_extended_option "artisan"      "debug-artisan  " "· Run an Artisan command with Xdebug enabled"
+  make_extended_option "artisan"      "debug-artisan  " "· Run an Artisan command with Xdebug enabled (port $XDEBUG_CLI_PORT)"
   make_extended_option "tinker"       "tinker         " "· Run Tinker (Laravel REPL)"
-  make_extended_option "tinker"       "debug-tinker   " "· Run Tinker with Xdebug enabled"
+  make_extended_option "tinker"       "debug-tinker   " "· Run Tinker with Xdebug enabled (port $XDEBUG_CLI_PORT)"
   make_extended_option "assets"       "assets         " "· Download, upload, swap assets - (checks $DATA_DIR for .tar.gz files)"
   echo ""
 }
@@ -71,6 +71,11 @@ handle_rl_extended() {
     post-install)
       post_install
       exit $?
+      ;;
+    composer)
+      # need everything after the first argument (eg. update --lock)
+      run_composer_command "${*:2}"
+      exit 0
       ;;
     artisan)
       prompt_artisan_command "$@"
