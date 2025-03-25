@@ -379,6 +379,13 @@ setup_alias() {
     # for each shell profile that is found
     for SHELL_PROFILE_FILE in "${SHELL_PROFILES[@]}"; do
       step_text "Checking $SHELL_PROFILE_FILE exists?"
+
+      # if it does not find one, lets add it
+      if [ ! -f "$SHELL_PROFILE_FILE" ]; then
+        step_text "Creating $SHELL_PROFILE_FILE 😈"
+        touch "$SHELL_PROFILE_FILE"
+      fi
+
       if [ -f "$SHELL_PROFILE_FILE" ]; then
         step_text "Found $SHELL_PROFILE_FILE - adding alias to it."
         step_text "👉 Source it, or open new terminal to use 'rl' alias."
