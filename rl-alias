@@ -8,7 +8,7 @@ rl() {
   export USING_RL_ALIAS
   # Check if the current directory has a run-local script
   if [ -f "run-local" ]; then
-    printf "\n=== \033[38;5;73m%s\033[0m:\n" "Found ./run-local - Running..."
+    printf "\n=== \033[38;5;73m%s\033[0m:\n" "Found ./run-local - Running..." >&2
     rl_cd "$@" || ./run-local "$@"
     return
   fi
@@ -31,12 +31,12 @@ rl() {
 
   # If no run-local scripts are found, print an error message and exit
   if [ ${#RUN_LOCAL_SCRIPTS[@]} -eq 0 ]; then
-    echo "No run-local scripts found in the specified directory."
+    echo "No run-local scripts found in the specified directory." >&2
     return 1
   fi
 
   # Display the list of found run-local scripts with colors and formatted numbers
-  echo -e "Available \033[38;5;73mrun-local\033[0m scripts: in \033[38;5;73m$RL_DEV_FOLDER\033[0m\n"
+  echo -e "Available \033[38;5;73mrun-local\033[0m scripts: in \033[38;5;73m$RL_DEV_FOLDER\033[0m\n" >&2
 
   unset options  # Ensure the array is cleared before use
   declare -a options  # Explicitly declare an indexed array
@@ -86,6 +86,8 @@ rl() {
 
 }
 
+export rl
+
 # if `rl cd`, we need just cd into the directory after finding the path
 function rl_cd() {
   # if $1 is cd, and $2 arg is a directory, cd into it
@@ -96,5 +98,3 @@ function rl_cd() {
   return 1
 }
 
-# Add the alias to the shell configuration
-alias rl=rl
