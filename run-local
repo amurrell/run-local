@@ -61,9 +61,6 @@ check_file() {
   return 0
 }
 
-# shellcheck disable=SC1090
-check_file "$REPO_ROOT/$RL_VARS_FILE_NAME" true && source "$REPO_ROOT/$RL_VARS_FILE_NAME"
-
 check_function() {
   if declare -F "$1" > /dev/null; then
     return 0
@@ -75,8 +72,6 @@ check_function() {
 DOCKERLOCAL_REPO_URL="https://github.com/amurrell/DockerLocal.git"
 # DockerLocal Directories
 COMMANDS_DIR="$REPO_ROOT/DockerLocal/commands"
-DATA_DIR="$REPO_ROOT/DockerLocal/data"
-export DATA_DIR # used by rl-funcs/rl-assets
 DATA_DUMPS_DIR="$REPO_ROOT/DockerLocal/data/dumps"
 CUSTOM_MYSQL_CONF_DIR="$REPO_ROOT/DockerLocal/data/custom"
 # DockerLocal Config Files
@@ -98,6 +93,9 @@ DB_IMAGE_FILE="$REPO_ROOT/DockerLocal/versions/override-db-image"
 NGINX_CONF_FILE="$REPO_ROOT/DockerLocal/nginx.site.conf"
 ENV_EXAMPLE_FILE="$REPO_ROOT/DockerLocal/env-example.yml"
 DOCKERFILE_TEMPLATE_FILE="$REPO_ROOT/DockerLocal/Dockerfile-template"
+
+# shellcheck disable=SC1090
+check_file "$REPO_ROOT/$RL_VARS_FILE_NAME" true && source "$REPO_ROOT/$RL_VARS_FILE_NAME"
 
 # Avoid messages from docker about tips & tricks
 export DOCKER_CLI_HINTS=false

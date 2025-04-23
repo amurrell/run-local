@@ -44,53 +44,70 @@ assets_swap() {
 }
 
 assets_download() {
-  # if ASSETS_SSH_SERVER is empty, exit - echo that we cannot download. Do it manually
-  if [ -z "$ASSETS_SSH_SERVER" ]; then
-    echo "ASSETS_SSH_SERVER is not set in rl-vars. Cannot download assets."
-    step_text "Please set ASSETS_SSH_SERVER in rl-vars or put a tar.gz file in $DATA_DIR manually."
-    exit 1;
-  fi
+  # Check required variables and exit if any are missing
+  required_vars=("ASSETS_SSH_SERVER" "ASSETS_SSH_SERVER_SOURCE_DIR" "ASSETS_LOCAL_PATH" "ASSETS_DOWNLOAD_PATH")
+  for var in "${required_vars[@]}"; do
+    if [ -z "${!var}" ]; then
+      echo "$var is not set in rl-vars. Cannot download assets."
+      step_text "Please set $var in rl-vars or put a tar.gz file in $DATA_DIR manually."
+      exit 1
+    fi
+  done
 
-  local file_name, source_folder, dir_path
+  local file_name
+  local source_folder
+  local dir_path
+  local download_path
+
   file_name="$ASSETS_FILE-$(date +%Y%m%d%H%M%S).tar.gz"
   # eg. uploads
   source_folder=$(basename "$ASSETS_SSH_SERVER_SOURCE_DIR")
   # e.g /var/www/site/wp-content/
   dir_path=$(dirname "$ASSETS_SSH_SERVER_SOURCE_DIR")
 
+  # download_path = ASSETS_DOWNLOAD_PATH - but remove ASSETS_FILE & add file_name using param expansion
+  download_path=${ASSETS_DOWNLOAD_PATH%/*}
+  download_path="$download_path/$file_name"
+
+  echo "source_folder: $source_folder"
+  echo "dir_path: $dir_path"
+
   # try to do ssh commands
-  step_text "Pass tar command via ssh to $SERVER"
-  ssh "$SERVER" -c "tar -czf ~/${file_name} -C ${dir_path} ${source_folder}"
+  step_text "Pass tar command via ssh to $ASSETS_SSH_SERVER"
+  ssh "$ASSETS_SSH_SERVER" "tar -czf ~/${file_name} -C ${dir_path} ${source_folder}"
 
   # if fail, exit
   if [ $? -ne 0 ]; then
-    echo "Failed to create $file_name on $SERVER"
+    echo "Failed to create $file_name on $ASSETS_SSH_SERVER"
     return
   fi
 
   # download the file
-  step_text "Downloading $file_name from $SERVER..."
-  scp "$SERVER:~/$file_name" "$ASSETS_DOWNLOAD_PATH"
+  step_text "Downloading $file_name from $ASSETS_SSH_SERVER..."
+  scp "$ASSETS_SSH_SERVER:~/$file_name" "$download_path"
 
   if [ $? -ne 0 ]; then
-    echo "Failed to download $file_name from $SERVER"
+    echo "Failed to download $file_name from $ASSETS_SSH_SERVER"
     return
   fi
 
-  step_text "Downloaded $file_name to $ASSETS_DOWNLOAD_PATH"
+  step_text "Downloaded $file_name to $download_path"
 }
 
 assets_upload() {
-  # check $DATA_DIR for .tar.gz files
-  if [ -z "$(ls -A "$DATA_DIR")" ]; then
+  # Build a list of .tar.gz files manually
+  files=()
+  while IFS= read -r -d '' file; do
+    files+=("$file")
+  done < <(find "$DATA_DIR" -maxdepth 1 -name "*.tar.gz" -print0)
+
+  if [ ${#files[@]} -eq 0 ]; then
     echo "No .tar.gz files found in $DATA_DIR"
   else
     echo "Found .tar.gz files in $DATA_DIR"
-    # prompt for which file to use to replace current uploads directory
-    # add option to fetch from server
     echo "Select a file to use to replace the current uploads directory"
-    mapfile -t options < <(find "$DATA_DIR" -maxdepth 1 -name "*.tar.gz")
-    select opt in "${options[@]}" "Fetch from server" "Quit"; do
+    options=("${files[@]}" "Fetch from server" "Quit")
+    select opt in "${options[@]}"; do
       case $opt in
         "Fetch from server")
           assets_download

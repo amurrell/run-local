@@ -63,7 +63,7 @@ ASSETS_SSH_SERVER='root@hostname' # to be used with ssh & scp (use ssh config to
 ASSETS_SSH_SERVER_SOURCE_DIR='/var/www/yourproject.com/wp-content/uploads'
 ASSETS_FILE='rl-assets-download'  # we will append a timestamp, tar.gz
 ASSETS_LOCAL_PATH="$REPO_ROOT/html/wp-content/uploads"
-ASSETS_DOWNLOAD_PATH="$REPO_ROOT/$DATA_DIR/$ASSETS_FILE"
+ASSETS_DOWNLOAD_PATH="$DATA_DUMPS_DIR/$ASSETS_FILE"
 
 # Export rl-extended variables
 
