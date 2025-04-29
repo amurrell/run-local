@@ -1,0 +1,693 @@
+#!/usr/bin/env bash
+
+## RUN LOCAL SCRIPT
+# This script is intended to be run from the root of a project repository.
+# It is a wrapper script to run commands in the DockerLocal environment (for now).
+# Alter your project's values in rl-vars to customize the script for your project.
+
+# To add to a project (1x setup):
+# - [README.md](https://github.com/amurrell/run-local/blob/main/README.md)
+# Customize & share with your team:
+# - [README-TEMPLATE.md](https://github.com/amurrell/run-local/blob/main/README-TEMPLATE.md)
+
+#### The scripts run-local and rl-alias are meant to stay free of customization so they can be updated easily.
+#### 👉 Customize your project in rl-vars, rl-extended and rl-funcs/rl-* files.
+
+# Save the initial directory where the script was executed
+INITIAL_DIR=$(pwd)
+NEW_DIR=""
+
+# Trap to return to the initial directory on exit
+trap 'cd "$INITIAL_DIR"' EXIT
+
+# === Find the project repo root ===
+if [ -z "$REPO_ROOT" ]; then
+  # run-local now lives in /rl/lib/, so REPO_ROOT is two levels up
+  REPO_ROOT="$(dirname "$(dirname "$(realpath "$0")")")"
+fi
+
+RL_DIR=$REPO_ROOT/rl
+
+# === Helper: find a file from rl-config/ first, fallback to rl/ ===
+find_rl_file() {
+  local filename="$1"
+
+  if [ -f "$REPO_ROOT/rl-config/$filename" ]; then
+    echo "$REPO_ROOT/rl-config/$filename"
+    return 0
+  fi
+
+  if [[ "$filename" == rl-* ]]; then
+    if [ -f "$RL_DIR/lib/$filename" ]; then
+      echo "$RL_DIR/lib/$filename"
+      return 0
+    fi
+  else
+    if [ -f "$RL_DIR/$filename" ]; then
+      echo "$RL_DIR/$filename"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
+color_text() {
+  local color=$1
+  local text=$2
+  case $color in
+    primary)
+      # teal
+      color="38;5;73"
+      ;;
+    secondary)
+      # blueish-white
+      color="38;5;152"
+      ;;
+    faint)
+      # soft-purple
+      color="38;5;132"
+      ;;
+    disabled)
+      # muted \e[38;5;59m
+      color="38;5;60"
+      #color="38;5;241"
+      ;;
+  esac
+
+  echo -e "\033[${color}m${text}\033[0m"
+}
+
+step_text() {
+  echo -e "$(color_text primary "===") $(color_text faint "$1")"
+}
+
+pretty_option() {
+  # if no 3rd arg
+  if [ -z "$3" ]; then
+    echo -e "  $(color_text primary "$1") $(color_text secondary "$2")"
+  else
+  # $3 is faint
+    echo -e "  $(color_text primary "$1") $(color_text secondary "$2") $(color_text faint "$3")"
+  fi
+}
+
+# === Load Core Configuration ===
+
+# Run Local Vars
+RL_VARS_FILE_NAME="rl-vars"
+RL_ALIAS_FILE_NAME="rl-alias"
+RL_COMPLETION_FILE_NAME="rl-completion"
+RL_EXTENDED_FILE_NAME="rl-extended"
+
+# Load rl-vars (required)
+VARS_FILE=$(find_rl_file "$RL_VARS_FILE_NAME") || { echo "❌ Missing $RL_VARS_FILE_NAME"; exit 1; }
+# shellcheck source=/dev/null
+source "$VARS_FILE"
+
+# Set funcs directory
+RL_FUNC_FOLDER="$REPO_ROOT/rl-config/funcs"
+if [ ! -d "$RL_FUNC_FOLDER" ]; then
+  RL_FUNC_FOLDER="$RL_DIR/funcs"
+fi
+export RL_FUNC_FOLDER
+
+# load rl-docker (required)
+if DOCKER_FILE=$(find_rl_file "rl-docker"); then
+  # shellcheck source=/dev/null
+  source "$DOCKER_FILE"
+else
+  echo "❌ Missing rl-docker"
+  exit 1
+fi
+
+# Load rl-alias (optional)
+ALIAS_FILE=$(find_rl_file "$RL_ALIAS_FILE_NAME");
+
+# Load rl-completion (optional)
+COMPLETION_FILE=$(find_rl_file "$RL_COMPLETION_FILE_NAME")
+
+# Load rl-extended (optional)
+if EXTENDED_FILE=$(find_rl_file "$RL_EXTENDED_FILE_NAME"); then
+  # shellcheck source=/dev/null
+  source "$EXTENDED_FILE"
+fi
+
+check_file() {
+  local file=$1
+  # default to false
+  local fail_if_not_found=${2:-false}
+
+  if [ ! -f "$file" ]; then
+
+    if [ "$fail_if_not_found" = true ]; then
+      step_text "❌ Error: $1 file not found."
+      exit 1
+    fi
+
+    return 1
+  fi
+  return 0
+}
+
+check_function() {
+  if declare -F "$1" > /dev/null; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# Avoid messages from docker about tips & tricks
+export DOCKER_CLI_HINTS=false
+
+# Globals
+SQL_FILE=''
+SELF_COMMAND="$0"
+
+# check alias
+check_alias() {
+  local strict=${1:-false}
+  # if we are using the alias, return true
+
+  # the alias is used, it exports this var
+  # - but we could be using ./run-local and still have it
+  if [ -n "$USING_RL_ALIAS" ]; then
+    return 0
+  fi
+
+  if [ "$strict" = true ]; then
+    return 1
+  fi
+
+  # checking zsh/bash -i subshells is too time-consuming
+  # so we'll just check if the file exists
+  if [ -f "$ALIAS_FILE" ]; then
+    return 0
+  fi
+  return 1
+}
+
+# ==== Command List (name|description) ====
+
+COMMANDS=(
+  "up|Start the site"
+  "down|Stop the site"
+  "ssh|Access site containers (default: web)"
+  "ssh-mysql|Access MySQL container"
+  "ssh-mysqlroot|Access MySQL as root"
+  "ssh-web|Access web container"
+  "ssh-webroot|Access web as webroot user"
+  "logs|View all logs"
+  "logs-php|View PHP logs"
+  "logs-access|View nginx access logs"
+  "logs-error|View nginx error logs"
+  "logs-xdebug|View Xdebug logs"
+  "db|Interact with the database"
+  "db-create|Create a new database"
+  "db-query|Query the database"
+  "db-import|Import an SQL file"
+  "db-export|Export the database"
+  "db-remove|Drop and recreate the database"
+  "db-list|List databases"
+  "npm|Run an npm command"
+  "install|First-time setup - 🧐 Is this your first run? Start here!"
+  "help|Show this help menu"
+  "list|List run-local scripts"
+  "cd|cd to your project folder"
+)
+
+if [[ "$1" == "commands" ]]; then
+  # Print all command names
+  for entry in "${COMMANDS[@]}"; do
+    echo "${entry%%|*}"
+  done
+
+  # Add extended commands (if supported)
+  if check_function show_extended_command_names; then
+    show_extended_command_names
+  fi
+
+  exit 0
+fi
+
+
+# ==== Prefix Order ====
+
+PREFIX_ORDER=()
+seen_prefixes=""
+
+for entry in "${COMMANDS[@]}"; do
+  cmd="${entry%%|*}"
+  prefix="${cmd%%-*}"
+
+  # Check if prefix is already seen
+  if ! echo "$seen_prefixes" | grep -q "\b$prefix\b"; then
+    PREFIX_ORDER+=("$prefix")
+    seen_prefixes="$seen_prefixes $prefix"
+  fi
+done
+
+# ==== Menu Display ====
+
+menu_output=""
+
+get_menu_output() {
+  # Figure out longest command for padding
+  max_command_len=0
+  for entry in "${COMMANDS[@]}"; do
+    cmd="${entry%%|*}"
+    [ ${#cmd} -gt "$max_command_len" ] && max_command_len=${#cmd}
+  done
+
+  # add extra padding on max_command_len
+  max_command_len=$((max_command_len + 4))
+  sub_command_len=$((max_command_len + 2))
+
+  # Menu build loop
+  number=1
+  for prefix in "${PREFIX_ORDER[@]}"; do
+    subcommands=()
+    for entry in "${COMMANDS[@]}"; do
+      cmd="${entry%%|*}"
+      [[ "${cmd%%-*}" == "$prefix" ]] && subcommands+=("$entry")
+    done
+
+    # cur_command_len = when number is 10+ we need to -1 from max_command_len
+    cur_command_len=$max_command_len
+    if [ "$number" -gt 9 ]; then
+      cur_command_len=$((max_command_len - 1))
+    fi
+
+    # Main command
+    cmd="${subcommands[0]%%|*}"
+    desc="${subcommands[0]#*|}"
+    padded_cmd=$(printf "%-${cur_command_len}s" "$cmd")
+    menu_output+="  $(color_text primary "$number)") $(color_text secondary "$padded_cmd") $(color_text faint "· $desc")"$'\n'
+    choice_map+=("$number|$cmd")
+
+    # Subcommands
+    if [ "${#subcommands[@]}" -gt 1 ]; then
+      letter=a
+      for ((i=1; i<${#subcommands[@]}; i++)); do
+        cmd="${subcommands[$i]%%|*}"
+        desc="${subcommands[$i]#*|}"
+        key="${number}${letter}"
+        padded_cmd=$(printf "%-${sub_command_len}s" "$cmd")
+        menu_output+="  $(color_text primary "$key)") $(color_text secondary "$padded_cmd") $(color_text faint "· $desc")"$'\n'
+        choice_map+=("$key|$cmd")
+        letter=$(echo "$letter" | tr "0-9a-y" "1-9a-z")
+      done
+    fi
+
+    ((number++))
+  done
+}
+
+
+show_menu() {
+  local self_command="$SELF_COMMAND"
+  local menu_output=""
+  local number=1
+  local choice_map=()
+
+  check_alias && self_command='rl'
+
+  echo ""
+  step_text "🧃 $(color_text secondary "Welcome to the run-local script!")"
+  echo ""
+  echo " Usage: "
+  pretty_option "$self_command" "<command>" "[options]"
+  echo ""
+  echo " Examples: "
+  pretty_option "$self_command" "up"
+  pretty_option "$self_command" "down"
+  pretty_option "$self_command" "install"
+  pretty_option "$self_command" "npm run hot"
+  pretty_option "$self_command" "ssh"
+  pretty_option "$self_command" "logs"
+  pretty_option "$self_command" "db"
+  pretty_option "$self_command" "db-query \"show tables;\""
+  echo ""
+  echo " Commands: "
+
+  get_menu_output
+  echo "$menu_output"
+
+  echo ""
+  echo "Commands & Interactive Prompt: RL-Extended (Custom) Commands:"
+  echo ""
+  check_function show_help_extended && show_help_extended
+  echo ""
+  echo " Running Project: ${PROJECT_NAME:-my-project}"
+  echo " Running on Port: ${PORT:-3030}"
+  echo " Using Database: ${DB_NAME:-default_db}"
+  echo ""
+
+  read -rp "Enter option by # or command to execute (enter to quit): " choice
+  handle_choice "$choice" "${choice_map[@]}"
+}
+
+# ==== Handle Choice ====
+
+handle_choice() {
+  local choice="$1"
+  shift
+  local fallback_command=""
+
+  for entry in "$@"; do
+    key="${entry%%|*}"
+    val="${entry#*|}"
+    if [[ "$choice" == "$key" ]]; then
+      ./run-local "$val"
+      return
+    fi
+    if [[ "$choice" == "$val" ]]; then
+      fallback_command="$val"
+    fi
+  done
+
+  if [[ -n "$fallback_command" ]]; then
+    ./run-local "$fallback_command"
+    return
+  fi
+
+  if check_function handle_rl_extended_choice; then
+    handle_rl_extended_choice "$choice"
+    return
+  fi
+
+  step_text "No (valid) option chosen... Quitting."
+  exit 1
+}
+
+# Ensure a command is provided
+if [ $# -eq 0 ]; then
+  show_menu
+  exit 0
+fi
+
+# Check if rl alias exists with 'alias rl'
+setup_alias() {
+  if check_alias true; then
+    return
+  fi
+
+  setup_source_file "$ALIAS_FILE" alias
+}
+
+setup_completion() {
+  # if rl-completion exists at DEV FOLDER, skip
+  if check_file "$COMPLETION_FILE"; then
+    return
+  fi
+
+  setup_source_file "$COMPLETION_FILE" completion
+}
+
+setup_source_file() {
+  source_file="$1"
+  file_type="$2"
+
+  if check_file "$source_file"; then
+    SHELL_PROFILES=()
+    DETECT_DEV_FOLDER=$(dirname "$INITIAL_DIR")
+
+    # if no alias in zsh, add to shell profiles to add
+    if [ "$file_type" = "alias" ] && ! zsh -i -c 'type rl' &> /dev/null; then
+      # ZSH profile loc can be Z_DOT_DIR or $HOME
+      SHELL_PROFILE_LOCATION=${Z_DOT_DIR:-$HOME}
+      SHELL_PROFILES+=("$SHELL_PROFILE_LOCATION/.zshrc")
+    fi
+
+    # if no alias in bash, add to shell profiles to add
+    if [ "$file_type" = "alias" ] && ! bash -i -c 'type rl' &> /dev/null; then
+      SHELL_PROFILES+=("$HOME/.bashrc")
+    fi
+
+    # if type is alias && length of shell profiles is 0, return
+    if [ "$file_type" = 'alias' ] && [ ${#SHELL_PROFILES[@]} -eq 0 ]; then
+      return
+    fi
+
+    # zsh - if type is completion && and we have rl alias - then check rl-completion is not already in the file
+    if [ "$file_type" = "completion" ] && zsh -i -c 'type rl' &> /dev/null; then
+      SHELL_PROFILE_LOCATION=${Z_DOT_DIR:-$HOME}
+
+      # check if rl-completion is in this file already (grep?)
+      if ! grep -q "rl-completion" "$SHELL_PROFILE_LOCATION/.zshrc"; then
+        SHELL_PROFILES+=("$SHELL_PROFILE_LOCATION/.zshrc")
+      fi
+    fi
+
+    # bash - if type is completion && and we have rl alias - then check rl-completion is not already in the file
+    if [ "$file_type" = "completion" ] && bash -i -c 'type rl' &> /dev/null; then
+      # check if rl-completion is in this file already (grep?)
+      if ! grep -q "rl-completion" "$HOME/.bashrc"; then
+        SHELL_PROFILES+=("$HOME/.bashrc")
+      fi
+    fi
+
+    # if symlink does not exist, create it.
+    if [ ! -L "$DETECT_DEV_FOLDER/$source_file" ]; then
+      step_text "Creating symlink to $source_file in $DETECT_DEV_FOLDER"
+      ln -s "$source_file" "$DETECT_DEV_FOLDER/$source_file"
+    fi
+
+    # for each shell profile that is found
+    for SHELL_PROFILE_FILE in "${SHELL_PROFILES[@]}"; do
+      step_text "Checking $SHELL_PROFILE_FILE exists?"
+
+      # if it does not find one, lets add it
+      if [ ! -f "$SHELL_PROFILE_FILE" ]; then
+        step_text "Creating $SHELL_PROFILE_FILE 😈"
+        touch "$SHELL_PROFILE_FILE"
+      fi
+
+      if [ -f "$SHELL_PROFILE_FILE" ]; then
+        step_text "Found $SHELL_PROFILE_FILE - adding rl-$file_type to it."
+        step_text "👉 Source it, or open new terminal to use 'rl' $file_type."
+        {
+          echo ""
+          echo "# Run Local - $file_type"
+          # only add this RL_DEV_FOLDER_VAR_NAME if it is not already in the file
+          if ! grep -q "$RL_DEV_FOLDER_VAR_NAME" "$SHELL_PROFILE_FILE"; then
+            echo "export $RL_DEV_FOLDER_VAR_NAME=\"$DETECT_DEV_FOLDER\""
+          fi
+          echo "source \"$DETECT_DEV_FOLDER/$source_file\""
+        } >> "$SHELL_PROFILE_FILE"
+      fi
+    done
+  fi
+}
+
+# Function to setup env file
+install_setup_env_file() {
+  local env_file=$1
+  local env_file_example=$2
+  local type=$3
+
+  # if env-file-example is empty, skip
+  if [ -z "$env_file_example" ]; then
+    step_text "Skipping setup of $type env file. No example ['$env_file_example'] file name provided."
+    return
+  fi
+
+  # if env file is empty, exit - bc we have example and not env - weird
+  if [ -z "$env_file" ]; then
+    step_text "❌ Error: $type env file ['$env_file'] is empty. Please ensure it exists, as the example does!"
+    exit 1
+  fi
+
+  # skip if env file exists
+  if [ -f "$env_file" ]; then
+    step_text "Skipping setup of $type env file. File already exists!"
+    return
+  fi
+
+  # Check if the env example file exists - but it was set
+  if [ ! -f "$env_file_example" ]; then
+    step_text "❌ Error: $type env example file '$env_file_example' does not exist. Clear the variable in rl-vars if you don't need it & re-run."
+    exit 1
+  fi
+
+  # Copy env example to env if env does not exist
+  cp "$env_file_example" "$env_file"
+  step_text "Copied $type $(basename "$env_file_example") to $(basename "$env_file")."
+
+  # prompt and ask if they have secrets they want to append to the file - they need to be able to paste a block of text
+  read -rp "Do you have secrets you want to append to the env file? (Y/N): " RESPONSE
+  case $RESPONSE in
+    [Yy]*)
+      step_text "Append your secrets to the env file. Press Ctrl+D when done."
+      cat >> "$env_file"
+      ;;
+    *) step_text "Skipping appending secrets to the env file." ;;
+  esac
+}
+
+# Function to handle installation
+install() {
+  # if we have a custom_install function, run it instead
+  if check_function custom_install; then
+    custom_install
+    exit 0
+  fi
+
+  step_text "⬇️ Install - Running first-time setup..."
+
+  step_text "Setting up APP env file..."
+  install_setup_env_file "$APP_ENV_FILE" "$APP_ENV_EXAMPLE_FILE" "APP"
+
+  step_text "Starting the docker process..."
+  ./run-local up
+  ./run-local db-import
+
+  if check_function 'post_install'; then
+    step_text "Running rl-extended post-install command..."
+    post_install
+    exit 0
+  fi
+
+  # Run npm command - if DEFAULT_NPM_COMMAND is not empty
+  if [ -n "$DEFAULT_NPM_COMMAND" ]; then
+    step_text "Running npm command: install && $DEFAULT_NPM_COMMAND"
+    run_npm_command "install && $DEFAULT_NPM_COMMAND"
+  fi
+
+  step_text "✅ Installation complete! The environment is ready to use."
+  printf "=== Visit the site at \e[32mhttp://localhost:%s\e[0m\n\n" "$DEFAULT_PORT"
+}
+
+run_npm_command() {
+  step_text "Running nvm install, nvm use - then npm command"
+  # Locate and source the nvm script
+  if [ -s "$HOME/.nvm/nvm.sh" ]; then
+    # shellcheck disable=SC1091
+    . "$HOME/.nvm/nvm.sh"
+  elif [ -s "/usr/local/opt/nvm/nvm.sh" ]; then
+    # shellcheck disable=SC1091
+    . "/usr/local/opt/nvm/nvm.sh"
+  else
+    echo "nvm not found. Please install nvm. Run commands manually: nvm use, npm install, npm run dev."
+    exit 1
+  fi
+
+  # Change to the app directory (where the package.json is located)
+  # check if APP_PATH/package.json exists
+
+  # if APP_PATH is empty, then its the same as $REPO_ROOT
+  if [ -z "$APP_PATH" ]; then
+    APP_PATH="$REPO_ROOT"
+  fi
+
+  if [ -f "$APP_PATH/package.json" ]; then
+    cd "$APP_PATH" || exit 1
+  else
+    step_text "❌ Error: No package.json found in $APP_PATH. Please ensure the path is correct in $APP_PATH_FILE."
+
+    # prompt to ask if they want to nvm use && npm init
+    step_text "Current Directory is: $(pwd)"
+    read -rp "Do you want to run 'nvm use' and 'npm init' (creates a package.json) in the current directory? (Y/N): " RESPONSE
+    case $RESPONSE in
+      [Nn]*)
+        echo "=== ❌ Operation canceled. Run 'install' to re-install the site."
+        exit 0
+        ;;
+      [Yy]*)
+        step_text "Running 'nvm use' and 'npm init'..."
+        nvm use
+        npm init -y
+        ;;
+      *)
+        echo "Invalid response. Operation canceled."
+        exit 1
+        ;;
+    esac
+  fi
+
+  nvm install "$(<"$NVM_VERSION_FILE")" && nvm use
+
+  if [ -z "$1" ]; then
+    npm install && $DEFAULT_NPM_COMMAND
+  else
+    eval "npm $1"
+  fi
+}
+
+setup_alias
+setup_completion
+
+# Determine the script to run based on the first argument
+case $1 in
+  up|down)
+    rl_docker "$1" "${@:2}"
+    exit $?
+    ;;
+  logs|logs-php|logs-access|logs-error|logs-xdebug)
+    rl_docker "logs" "$1" "${@:2}"
+    exit $?
+    ;;
+  ssh|ssh-web|ssh-webroot|ssh-mysql|ssh-mysqlroot)
+    rl_docker "ssh" "$1" "${@:2}"
+    exit $?
+    ;;
+  db|db-create|db-query|db-import|db-export|db-remove|db-list)
+    rl_docker "db" "$1" "${@:2}"
+    exit $?
+    ;;
+  npm)
+    # need everything after the first argument (eg. install && run dev)
+    run_npm_command "${*:2}"
+    exit 0
+    ;;
+  install)
+    install
+    exit 0
+    ;;
+  help)
+    show_menu
+    exit 0
+    ;;
+  list)
+    # check alias is installed (using alias) requirement for rl list
+    if ! check_alias true; then
+      step_text "Cannot list without alias 'rl', and it is not installed."
+      step_text "👉 Please run './run-local' again and watch for alias info, or manually install it."
+      exit 1
+    fi
+    # if we go 1 layer out, it will force rl alias
+    # need to do interatively so we can use the alias
+    $SHELL -i -c "cd ../ && rl"
+    exit $?
+    ;;
+  cd)
+    step_text "Changing directory to (show all args) ${*:2}"
+    # change directory - falls back on trap (initial dir if not set)
+    if [ -n "$2" ]; then
+      echo "Changing directory to $REPO_ROOT/$2"
+      if [ -d "$REPO_ROOT/$2" ]; then
+        # set NEW_DIR to the new directory - this will make sure we go there
+        echo "Setting NEW_DIR to $REPO_ROOT/$2"
+        NEW_DIR="$REPO_ROOT/$2"
+        exit 0
+      else
+        step_text "❌ Error: Directory '$2' not found in the repository."
+        exit 1
+      fi
+    fi
+    exit 0
+    ;;
+  *)
+    echo "Checking for extended command..."
+    if check_function 'handle_rl_extended'; then
+      step_text "Running extended command: $1 ${#:2}"
+      handle_rl_extended "$1" "${@:2}"
+      exit 0
+    fi
+
+    step_text "❌ Error: Unknown command '$1'."
+    show_menu
+    exit 1
+    ;;
+esac

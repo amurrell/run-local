@@ -1,0 +1,96 @@
+# Safe-to-templating ARGs
+ARG PHP_VERSION
+ARG NVM_VERSION
+
+FROM dunglas/frankenphp:1.5.0-php${PHP_VERSION}-bookworm
+
+LABEL maintainer="Angela Murrell <me@angelamurrell.com>"
+
+ARG PHP_VERSION
+ARG NVM_VERSION
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TERM=xterm
+ENV REDIS_URL=redis://redis
+
+# System dependencies + curl + git (needed for NVM)
+RUN apt-get update && apt-get install -y \
+  unzip nano curl git build-essential \
+  libzip-dev libicu-dev libonig-dev \
+  libjpeg-dev libpng-dev libwebp-dev libfreetype6-dev \
+  gnupg libyaml-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+RUN install-php-extensions \
+  bcmath \
+  ctype \
+  curl \
+  dom \
+  fileinfo \
+  json \
+  mbstring \
+  openssl \
+  pcre \
+  pdo_pgsql \
+  pgsql \
+  tokenizer \
+  xml \
+  intl \
+  zip \
+  redis \
+  gd \
+  yaml \
+  xdebug \
+  opcache
+
+# Setup NVM + install Node + PM2
+ENV NVM_DIR=/usr/local/nvm
+ENV NODE_VERSION=${NVM_VERSION}
+RUN mkdir -p $NVM_DIR && \
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash && \
+  . "$NVM_DIR/nvm.sh" && \
+  nvm install $NODE_VERSION && \
+  nvm use $NODE_VERSION && \
+  nvm alias default $NODE_VERSION && \
+  npm install -g pm2 && \
+  ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/node" /usr/local/bin/node && \
+  ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/npm" /usr/local/bin/npm && \
+  ln -s "$NVM_DIR/versions/node/$NODE_VERSION/bin/pm2" /usr/local/bin/pm2
+
+# Working directory and copy app files (actual app mounts later)
+WORKDIR /var/www/site
+COPY . .
+
+# Fix FrankenPHP CLI symlink issue
+RUN rm /usr/local/bin/php && ln -s /usr/bin/php /usr/local/bin/php
+RUN php -r "echo PHP_SAPI . PHP_EOL;"
+
+# Install Composer
+RUN curl -sS https://getcomposer.org/installer | php && \
+  mv composer.phar /usr/local/bin/composer
+
+# Create writable dirs
+RUN mkdir -p storage bootstrap/cache DockerLocal/logs && \
+  chown -R www-data:www-data storage bootstrap/cache DockerLocal/logs && \
+  chmod -R ug+rw storage bootstrap/cache DockerLocal/logs
+
+# Reference config files from mounted volume
+RUN ln -sf /var/www/site/php.custom.ini /usr/local/etc/php/conf.d/99-upload.ini && \
+  ln -sf /var/www/site/xdebug.custom.ini /usr/local/etc/php/conf.d/99-xdebug.ini && \
+  ln -sf /var/www/site/frankenphp.yaml /var/www/site/frankenphp.yaml
+
+# Adjust UID for host match (optional)
+RUN usermod -u 1000 www-data
+
+USER www-data
+
+# Run pm2 start if ecosystem file exists
+RUN if [ -f /var/www/site/ecosystem.config.js ]; then \
+  pm2 start /var/www/site/ecosystem.config.js; \
+  fi
+
+EXPOSE 80
+
+CMD ["frankenphp"]
+

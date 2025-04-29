@@ -3,8 +3,8 @@
 ## Use to extend the usage of the rl commmand
 
 # Load any rl-* functions in the rl-funcs folder
-if [ -d "$REPO_ROOT/$RL_FUNC_FOLDER" ]; then
-  for file in "$REPO_ROOT/$RL_FUNC_FOLDER/rl-"*; do
+if [ -d "$RL_FUNC_FOLDER" ]; then
+  for file in "$RL_FUNC_FOLDER/rl-"*; do
     if [ -f "$file" ]; then
       # shellcheck source=/dev/null
       source "$file"
@@ -19,7 +19,7 @@ EXTENDED_COMMANDS=()
 # see if rl-<$1> exists in rl-funcs/ folder, primary or disabled
 get_extended_option_color() {
   local color='disabled'
-  [ -f "$REPO_ROOT/$RL_FUNC_FOLDER/rl-$1" ] && color='primary'
+  [ -f "$RL_FUNC_FOLDER/rl-$1" ] && color='primary'
   echo "$color"
 }
 
@@ -29,6 +29,8 @@ make_extended_option(){
   local description=$3
   local color
   local trimmed_command
+
+  display_func_folder_name=${RL_FUNC_FOLDER#"$REPO_ROOT/"}
   color=$(get_extended_option_color "$check")
   #index is the length of the array
   index=${#EXTENDED_COMMANDS[@]} # Zero-based index
@@ -37,7 +39,7 @@ make_extended_option(){
   # if color==disabled, append -disabled to the command
   if [ "$color" == "disabled" ]; then
     trimmed_command="$trimmed_command [disabled]"
-    description="· Add rl-funcs/rl-$check to enable"
+    description="· Add $display_func_folder_name/rl-$check to enable"
   fi
   EXTENDED_COMMANDS+=("$trimmed_command")
   # Adjust the displayed index to be one-based (index + 1)
@@ -49,67 +51,6 @@ make_extended_option(){
   else
     pretty_option "$(color_text "$color" "e$index)")" "$command" "$description"
   fi
-}
-
-show_help_extended() {
-  color_text faint "RL-Extended (Custom) Commands: "
-  echo ""
-  # the $check vs $command is for the file it comes from, eg. check "artisan" to get both artisan and debug-artisan commands
-  make_extended_option "post-install" "post-install   " "· Run post-install commands"
-  make_extended_option "composer"     "composer       " "· Run a Composer command"
-  make_extended_option "artisan"      "artisan        " "· Run an Artisan command"
-  make_extended_option "artisan"      "debug-artisan  " "· Run an Artisan command with Xdebug enabled (port $XDEBUG_CLI_PORT)"
-  make_extended_option "tinker"       "tinker         " "· Run Tinker (Laravel REPL)"
-  make_extended_option "tinker"       "debug-tinker   " "· Run Tinker with Xdebug enabled (port $XDEBUG_CLI_PORT)"
-  make_extended_option "assets"       "assets-download" ". Download assets folder via ssh into tar.gz in DockerLocal/data"
-  make_extended_option "assets"       "assets         " ". Checks DockerLocal/data for .tar.gz files, swaps/backs up current uploads"
-  echo ""
-}
-
-handle_rl_extended() {
-  # Determine the script to run based on the first argument
-  case $1 in
-    post-install)
-      post_install
-      exit $?
-      ;;
-    composer)
-      # need everything after the first argument (eg. update --lock)
-      run_composer_command "${*:2}"
-      exit 0
-      ;;
-    artisan)
-      prompt_artisan_command "$@"
-      # need everything after the first argument (eg. route:list)
-      run_artisan_command "${*:2}"
-      exit 0
-      ;;
-    debug-artisan)
-      prompt_artisan_command "$@"
-      run_debug_artisan_command "${*:2}"
-      exit 0
-      ;;
-    tinker)
-      run_tinker_command
-      exit 0
-      ;;
-    debug-tinker)
-      run_debug_tinker_command
-      exit 0
-      ;;
-    assets-download)
-      assets_download
-      exit 0
-      ;;
-    assets)
-      assets_upload
-      exit 0
-      ;;
-    *)
-      echo "Unknown (extended) command: $1"
-      exit 1
-      ;;
-  esac
 }
 
 handle_rl_extended_choice() {
@@ -178,3 +119,11 @@ show_extended_command_names() {
     echo "$cmd" | cut -d' ' -f1 | sed 's/\[disabled\]//'
   done
 }
+
+# use find_rl_file to find the file
+if OPTIONS_FILE=$(find_rl_file "rl-extended-options"); then
+  # shellcheck source=/dev/null
+  source "$OPTIONS_FILE"
+else
+  step_text "No rl-extended-options file found. Skipping extended options."
+fi

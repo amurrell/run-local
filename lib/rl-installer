@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+set -e
+
+echo "🔧 Installing run-local..."
+
+# Clone run-local if needed
+if [ ! -d "rl" ]; then
+  echo "📥 Cloning run-local core files..."
+  git clone --depth=1 https://github.com/amurrell/run-local rl
+else
+  echo "✅ 'rl' directory already exists."
+fi
+
+mkdir -p rl-config
+
+EXTENDED_OPTIONS_FILE="rl-extended-options"
+ORIGINAL_VARS_FILE="rl/lib/rl-vars"
+NEW_VARS_FILE="rl-config/rl-vars"
+TMP_PROMPTS="/tmp/rl-vars-prompt.$$"
+
+echo "#!/usr/bin/env bash" > "$NEW_VARS_FILE"
+echo "" >> "$NEW_VARS_FILE"
+
+echo "🛠 Customizing variables (press enter to keep defaults):"
+echo ""
+
+# Extract rl-var comments and following variable lines to a temp file
+awk '
+  BEGIN { pending = 0; }
+  /^# rl-var: / {
+    desc = substr($0, 11);
+    pending = 1;
+    next;
+  }
+  /^[A-Za-z_][A-Za-z0-9_]*=.+/ && pending == 1 {
+    keyval = $0;
+    printf "%s\n%s\n", desc, keyval;
+    pending = 0;
+  }
+' "$ORIGINAL_VARS_FILE" > "$TMP_PROMPTS"
+
+# Read 2 lines at a time: description then key=val
+exec 3< "$TMP_PROMPTS"
+while IFS= read -r desc <&3 && IFS= read -r keyval <&3; do
+  key=$(echo "$keyval" | cut -d= -f1)
+  raw_val=$(echo "$keyval" | cut -d= -f2- | sed 's/^["'\'']//; s/["'\'']$//')
+
+  printf "%s [%s]: " "$desc" "$raw_val"
+  read user_input
+  user_input="${user_input:-$raw_val}"
+
+  echo "# rl-var: $desc" >> "$NEW_VARS_FILE"
+  echo "$key=\"$user_input\"" >> "$NEW_VARS_FILE"
+  echo "" >> "$NEW_VARS_FILE"
+done
+exec 3<&-
+
+# Append remaining lines (not promptable ones)
+awk '
+  BEGIN { skip = 0; }
+  /^#!/ { next; }
+  /^# rl-var: / { skip = 1; next; }
+  /^[A-Za-z_][A-Za-z0-9_]*=.+/ && skip == 1 { skip = 0; next; }
+  { print }
+' "$ORIGINAL_VARS_FILE" >> "$NEW_VARS_FILE"
+
+rm -f "$TMP_PROMPTS"
+
+echo ""
+echo "✅ Created rl-config/rl-vars with customized values."
+
+# Copy $EXTENDED_OPTIONS_FILE if needed
+if [ ! -f "rl-config/$EXTENDED_OPTIONS_FILE" ]; then
+  cp "rl/lib/$EXTENDED_OPTIONS_FILE" "rl-config/$EXTENDED_OPTIONS_FILE"
+  echo "✅ Copied default $EXTENDED_OPTIONS_FILE"
+fi
+
+# Create launcher if missing
+if [ ! -f "run-local" ]; then
+  echo "🧪 Creating launcher script..."
+  cat <<'EOF' > run-local
+#!/usr/bin/env bash
+DIR="$(cd "$(dirname "$0")" && pwd)"
+export REPO_ROOT="$DIR"
+"$DIR/rl/lib/run-local" "$@"
+EOF
+  chmod +x run-local
+  echo "✅ Created 'run-local' launcher"
+fi
+
+echo ""
+echo "🎉 Done! Run your site with:"
+echo "   ./run-local up"

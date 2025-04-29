@@ -1,0 +1,310 @@
+#!/usr/bin/env bash
+
+# =============================
+# RL-DOCKER LIBRARY
+# =============================
+
+# detect REPO root
+if [ -z "$REPO_ROOT" ]; then
+  echo "❌ REPO_ROOT is not set. Please source from run-local or setup script."
+  return 1
+fi
+
+# -------------------------------------
+# Helper Functions
+# -------------------------------------
+
+load_arg() {
+  local arg_name="$1"
+  local value=""
+  if [ -f "$REPO_ROOT/rl-config/docker/args/$arg_name" ]; then
+    value=$(<"$REPO_ROOT/rl-config/docker/args/$arg_name")
+  elif [ -f "$REPO_ROOT/rl/docker/args/$arg_name" ]; then
+    value=$(<"$REPO_ROOT/rl/docker/args/$arg_name")
+  fi
+  echo "$value"
+}
+
+sync_defaults_to_args() {
+  mkdir -p "$REPO_ROOT/rl-config/docker/args"
+
+  # Extract all DEFAULT_* variables from the environment
+  local defaults
+  defaults=$(compgen -v | grep '^DEFAULT_')
+
+  for var in $defaults; do
+    local key="${var#DEFAULT_}"  # Strip DEFAULT_ prefix
+    local value="${!var}"        # Indirect variable expansion to get value
+
+    local target_file="$REPO_ROOT/rl-config/docker/args/$key"
+
+    if [ ! -f "$target_file" ]; then
+      echo "$(color_text primary "Setting new default") $(color_text secondary "$key") → $(color_text faint "$value")"
+      echo "$value" > "$target_file"
+    else
+      # Compare the existing file content
+      local existing
+      existing=$(<"$target_file")
+
+      if [ "$existing" != "$value" ]; then
+        echo "$(color_text primary "Updating default") $(color_text secondary "$key")"
+        echo "  Old: $(color_text faint "$existing")"
+        echo "  New: $(color_text faint "$value")"
+        echo "$value" > "$target_file"
+      fi
+    fi
+  done
+}
+
+compute_ports() {
+  BASE_PORT=$(load_arg "PORT")
+  WEB_PORT="$BASE_PORT"
+  SSL_PORT=$((443 + BASE_PORT))
+  SOCKET_PORT=$((6001 + BASE_PORT))
+  MYSQL_PORT=$((3306 + BASE_PORT))
+  MEMCACHED_PORT=$((11211 + BASE_PORT))
+  REDIS_PORT=$((6379 + BASE_PORT))
+}
+
+compile_templates() {
+  echo "Compiling templates..."
+
+  mkdir -p "$REPO_ROOT/rl/docker/computed"
+
+  local templates_dir="$REPO_ROOT/rl-config/docker/templates"
+  if [ ! -d "$templates_dir" ]; then
+    templates_dir="$REPO_ROOT/rl/docker/templates"
+  fi
+
+  for template in "$templates_dir"/*.template; do
+    [ -e "$template" ] || continue
+
+    local template_name
+    template_name=$(basename "$template" .template)
+    local output_file="$REPO_ROOT/rl/docker/computed/$template_name"
+
+    # Load all args into env
+    set -a
+    for arg_file in "$REPO_ROOT/rl/docker/args/"* "$REPO_ROOT/rl-config/docker/args/"*; do
+      [ -e "$arg_file" ] || continue
+      var_name=$(basename "$arg_file")
+      var_value=$(<"$arg_file")
+      export "$var_name"="$var_value"
+    done
+    set +a
+
+    envsubst < "$template" > "$output_file"
+
+    echo " → $output_file"
+  done
+}
+
+docker_compose_cmd() {
+  if command -v docker-compose &> /dev/null; then
+    echo "docker-compose"
+  else
+    echo "docker compose"
+  fi
+}
+
+check_up() {
+  if ! $(docker_compose_cmd) -p "$DOCKER_PROJECT" -f "$COMPOSE_FILE" ps | grep -q "Up"; then
+    echo "❌ Error: Containers are not running."
+    return 1
+  fi
+}
+
+# -------------------------------------
+# Main Dispatcher
+# -------------------------------------
+
+rl_docker() {
+  local COMMAND="$1"
+  shift || true
+
+  # Load defaults at time of call
+  local DOCKER_PROJECT="rl-docker$(load_arg "PORT")"
+  local COMPOSE_FILE="$REPO_ROOT/rl/docker/computed/docker-compose.yml"
+  local DATA_DUMPS_DIR="$REPO_ROOT/rl/docker/data/dumps"
+  local DB_PASSWORD=$(load_arg "DB_PASSWORD")
+  local DB_USERNAME=$(load_arg "DB_USERNAME")
+  local DATABASE=$(load_arg "DATABASE")
+  local MYSQL_CONTAINER_NAME="${DOCKER_PROJECT}_mysql_1"
+
+  case "$COMMAND" in
+    up)
+      sync_defaults_to_args
+      return 0;
+      compute_ports
+      compile_templates
+      echo "Starting containers..."
+      $(docker_compose_cmd) -p "$DOCKER_PROJECT" -f "$COMPOSE_FILE" up --build -d
+      ;;
+
+    down)
+      compute_ports
+      compile_templates
+      echo "Stopping containers..."
+      $(docker_compose_cmd) -p "$DOCKER_PROJECT" -f "$COMPOSE_FILE" down
+      ;;
+
+    ssh)
+      check_up || return 1
+      local SERVICE="$1"
+      case "$SERVICE" in
+        ""|"ssh"|"web")
+          docker exec -it "${DOCKER_PROJECT}_web_1" /bin/bash
+          ;;
+        ssh-webroot)
+          docker exec -u root -it "${DOCKER_PROJECT}_web_1" /bin/bash
+          ;;
+        ssh-mysql)
+          docker exec -it "${DOCKER_PROJECT}_mysql_1" /bin/bash
+          ;;
+        ssh-mysqlroot)
+          docker exec -u root -it "${DOCKER_PROJECT}_mysql_1" /bin/bash
+          ;;
+        *)
+          echo "Unknown ssh service: $SERVICE"
+          return 1
+          ;;
+      esac
+      ;;
+
+    logs)
+      check_up || return 1
+      local LOG_TARGET="$1"
+      case "$LOG_TARGET" in
+        ""|"logs"|"logs-app")
+          docker logs -f "${DOCKER_PROJECT}_web_1"
+          ;;
+        logs-php)
+          docker exec -it "${DOCKER_PROJECT}_web_1" tail -f /var/www/site/rl/logs/php.log
+          ;;
+        logs-access)
+          docker exec -it "${DOCKER_PROJECT}_web_1" tail -f /var/www/site/rl/logs/access.log
+          ;;
+        logs-error)
+          docker exec -it "${DOCKER_PROJECT}_web_1" tail -f /var/www/site/rl/logs/error.log
+          ;;
+        logs-xdebug)
+          docker exec -it "${DOCKER_PROJECT}_web_1" tail -f /var/www/site/rl/logs/xdebug.log
+          ;;
+        *)
+          echo "Unknown logs command: $LOG_TARGET"
+          return 1
+          ;;
+      esac
+      ;;
+
+    db-create)
+      check_up || return 1
+      local db_name="$1"
+      if [ -z "$db_name" ]; then
+        db_name="$DATABASE" # fallback to default
+      fi
+
+      echo "➡️  Creating database '${db_name}' inside container '${MYSQL_CONTAINER_NAME}'..."
+
+      docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -u root -p"${DB_PASSWORD}" -e "CREATE DATABASE IF NOT EXISTS \`${db_name}\`;"
+
+      if [ $? -eq 0 ]; then
+        echo "✅ Database '${db_name}' created or already existed."
+      else
+        echo "❌ Failed to create database '${db_name}'."
+        return 1
+      fi
+      ;;
+
+    db)
+      check_up || return 1
+      docker exec -it "${MYSQL_CONTAINER_NAME}" mysql -u"$DB_USERNAME" -p"$DB_PASSWORD"
+      ;;
+
+    db-query)
+      check_up || return 1
+      local QUERY="${1:-SHOW DATABASES;}"
+      docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -u"$DB_USERNAME" -p"$DB_PASSWORD" -e "$QUERY"
+      ;;
+
+    db-list)
+      check_up || return 1
+      docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -u"$DB_USERNAME" -p"$DB_PASSWORD" -e "SHOW DATABASES;"
+      ;;
+
+    db-import)
+      check_up || return 1
+
+      local SQL_FILE="$1"
+
+      local DATA_DUMPS_DIR="$REPO_ROOT/rl/docker/data/dumps"
+
+      mkdir -p "$DATA_DUMPS_DIR" # just in case
+
+      if [ -z "$SQL_FILE" ]; then
+        echo "ℹ️ No SQL file provided."
+        echo "📂 Please place your SQL file into: $DATA_DUMPS_DIR"
+        echo ""
+
+        # Try to pick one
+        local sql_files=("$DATA_DUMPS_DIR"/*.sql)
+
+        if [ ${#sql_files[@]} -eq 0 ]; then
+          echo "❌ No .sql files found in $DATA_DUMPS_DIR."
+          return 1
+        elif [ ${#sql_files[@]} -eq 1 ]; then
+          SQL_FILE=$(basename "${sql_files[0]}")
+          echo "✅ Found one SQL file: $SQL_FILE"
+        else
+          echo "Multiple SQL files found:"
+          select picked_sql in "${sql_files[@]}"; do
+            if [ -n "$picked_sql" ]; then
+              SQL_FILE=$(basename "$picked_sql")
+              break
+            else
+              echo "Invalid selection."
+            fi
+          done
+        fi
+      fi
+
+      # Validate the picked file
+      if [ ! -f "$DATA_DUMPS_DIR/$SQL_FILE" ]; then
+        echo "❌ File not found: $DATA_DUMPS_DIR/$SQL_FILE"
+        return 1
+      fi
+
+      echo "➡️ Importing SQL file: $SQL_FILE into database: $DATABASE..."
+
+      docker cp "$DATA_DUMPS_DIR/$SQL_FILE" "${MYSQL_CONTAINER_NAME}:/tmp/$SQL_FILE"
+      docker exec -i "${MYSQL_CONTAINER_NAME}" mysql -u"$DB_USERNAME" -p"$DB_PASSWORD" "$DATABASE" < "/tmp/$SQL_FILE"
+
+      if [ $? -eq 0 ]; then
+        echo "✅ Successfully imported $SQL_FILE into database $DATABASE."
+      else
+        echo "❌ Failed to import $SQL_FILE."
+        return 1
+      fi
+      ;;
+
+
+    db-export)
+      check_up || return 1
+      mkdir -p "$DATA_DUMPS_DIR"
+      docker exec "${MYSQL_CONTAINER_NAME}" /usr/bin/mysqldump -u"$DB_USERNAME" -p"$DB_PASSWORD" "$DATABASE" > "$DATA_DUMPS_DIR/${DATABASE}_dump.sql"
+      echo "✅ Exported database $DATABASE"
+      ;;
+
+    db-remove)
+      check_up || return 1
+      echo "⚠️ Dropping and recreating database $DATABASE"
+      docker exec "${MYSQL_CONTAINER_NAME}" mysql -u"$DB_USERNAME" -p"$DB_PASSWORD" -e "DROP DATABASE IF EXISTS $DATABASE; CREATE DATABASE $DATABASE;"
+      echo "✅ Database recreated: $DATABASE"
+      ;;
+
+    *)
+      echo "❌ Unknown rl_docker command: $COMMAND"
+      return 1
+      ;;
+  esac
+}

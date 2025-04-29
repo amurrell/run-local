@@ -1,0 +1,31 @@
+# Run Local files #
+######################
+*.*
+!.gitkeep
+!.gitignore
+!.gitmodules
+
+# rl docker files #
+!**/docker-compose.yml.template
+!**/Dockerfile.template
+!**/frankenphp.yaml.template
+!**/php.custom.ini
+!**/xdebug.custom.ini
+!**/ecosystem.config.js
+!**/data/custom/options.cnf
+
+**/dumps/*
+!**/dumps/.gitkeep
+
+**/custom/*
+!**/custom/.gitkeep
+!**/custom/options.cnf
+
+**/mysql/*
+!**/mysql/.gitkeep
+
+# OS generated files #
+######################
+.DS_Store*
+ehthumbs.db
+Thumbs.db

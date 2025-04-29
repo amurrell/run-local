@@ -5,7 +5,14 @@ A more custom way to do local development, where a bash script saves you/your te
 > [!TIP]
 > Ideal for laravel, wordpress, or nodejs projects, where you have a database dump, image assets, or env variables. Really ideal if you have a lot of these projects and want consistency and ease to switch between them, onboard new team members, or just make your life easier.
 
-Used with [DockerLocal](https://github.com/amurrell/DockerLocal) for Docker container creation.
+## Install
+
+Requires **Docker Desktop**, bash 3.25, and **nvm** (Node Version Manager) to be installed (if using npm/node).
+
+```
+cd your-project-folder
+curl -s https://raw.githubusercontent.com/amurrell/run-local/main/lib/rl-installer | bash
+```
 
 ### Usage
 
