@@ -5,7 +5,7 @@ A more custom way to do local development or generate docker build files, where 
 > [!TIP]
 > Ideal for laravel, wordpress, or nodejs projects, where you have a database dump, image assets, or env variables. Really ideal if you have a lot of these projects and want consistency and ease to switch between them, generate docker build files, onboard new team members, or just make your life easier.
 
-By default this project is using frankenPHP (& caddy) docker images, PHP 8.4 (at time of writing), Node 20.14.0 and MariaDB 11.4, but you can change all settings and all template files to suit your needs using `rl-config` folder to override defaults.
+By default this project is using frankenPHP (& caddy) docker images, PHP 8.4 (at time of writing), Node 22.15.0 and MariaDB 11.4, but you can change all settings and all template files to suit your needs using `rl-config` folder to override defaults.
 
 ### Usage
 
@@ -135,7 +135,7 @@ If your project has a `rl-config` folder, you can easily get started by just run
 
 ### rl alias
 
-The `rl` alias is a shortcut to run the `run-local.sh` script. You can run it from **anywhere** and it will prompt for which run-local project you want to run when you have multiple projects in a code directory (defined by `RL_DEV_FOLDER` in your shell profile). Running `run-local` shoulld install the alias for you, so test it out!
+The `rl` alias is a shortcut to run the `run-local` script. You can run it from **anywhere** and it will prompt for which run-local project you want to run when you have multiple projects in a code directory (defined by `RL_DEV_FOLDER` in your shell profile). Running `run-local` shoulld install the alias for you, so test it out!
 
 **Usage**
 
