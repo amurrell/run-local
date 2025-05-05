@@ -108,3 +108,9 @@ fi
 echo ""
 echo "🎉 Done! Run your site with:"
 echo "   ./run-local up"
+
+# Check if the script was saved as a file and not piped via curl | bash
+if [[ "$0" == *rl-installer ]]; then
+  echo "🧹 Cleaning up installer script..."
+  rm -- "$0"
+fi

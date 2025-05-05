@@ -154,7 +154,6 @@ check_function() {
 export DOCKER_CLI_HINTS=false
 
 # Globals
-SQL_FILE=''
 SELF_COMMAND="$0"
 
 # check alias
@@ -802,6 +801,7 @@ case $1 in
         # set NEW_DIR to the new directory - this will make sure we go there
         echo "Setting NEW_DIR to $REPO_ROOT/$2"
         NEW_DIR="$REPO_ROOT/$2"
+        cd "$NEW_DIR" || exit 1
         exit 0
       else
         step_text "❌ Error: Directory '$2' not found in the repository."
