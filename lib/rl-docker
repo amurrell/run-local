@@ -77,16 +77,6 @@ compute_ports() {
 }
 
 compile_templates() {
-  local prompt_to_compile=${1:-true}
-
-  # if prompt_to_compile is true, ask the user if they want to compile templates if check_up false is true
-  if [ "$prompt_to_compile" = true ]; then
-    if check_up false; then
-      echo "ℹ️ Docker containers are already running, so skipping compiling..."
-      echo "→ Run 'rl build' to recompile templates."
-    fi
-  fi
-
   step_text "Compiling templates..."
 
   local templates_dir="$REPO_ROOT/rl-config/docker/templates"
@@ -131,6 +121,14 @@ compile_templates() {
     echo "$(color_text primary "Compiled template") $(color_text secondary "$template")"
     echo " → $(color_text faint "$output_file")"
   done
+
+  # if the rl-config/docker/conf folder doesnt exist, copy it to from rl/docker/conf
+  if [ ! -d "$REPO_ROOT/rl-config/docker/conf" ]; then
+    step_text "Copying conf files to rl-config/docker/conf - they were missing."
+    mkdir -p "$REPO_ROOT/rl-config/docker/conf"
+    cp "$REPO_ROOT/rl/docker/conf/"* "$REPO_ROOT/rl-config/docker/conf/"
+    echo "$(color_text primary "Copied") $(color_text secondary "conf") $(color_text faint "to rl-config/docker/conf")"
+  fi
 }
 
 docker_compose_cmd() {
@@ -152,8 +150,7 @@ get_container_name() {
 }
 
 check_up() {
-  local SHOW_ERROR=${1:-true}
-  local service=${2:-"web"}
+  local service="web"
   local container_name
   container_name=$(get_container_name "$service")
 
@@ -339,6 +336,8 @@ rl_docker() {
   local DATABASE
   local DB_IMAGE
 
+  sync_defaults_to_args
+
   DOCKER_PROJECT="rl-docker$(load_arg "PORT")"
   COMPOSE_FILE="$REPO_ROOT/rl-config/docker/computed/docker-compose.yml"
   DATA_DUMPS_DIR="$REPO_ROOT/rl/docker/data/dumps"
@@ -355,27 +354,35 @@ rl_docker() {
 
   case "$COMMAND" in
     up)
-      sync_defaults_to_args
-      compile_templates true # prompt to compile
+      compile_templates true
       copy_conf_files_to_computed
       echo "Starting containers..."
       $(docker_compose_cmd) -p "$DOCKER_PROJECT" -f "$COMPOSE_FILE" up --build -d
 
-      # echo the url http://localhost:$(load_arg "PORT")
-      echo "➡️  Your site is available at: $(color_text secondary "http://$(load_arg "SERVER_DOMAIN"):$(load_arg "PORT")")"
+      # if SERVER_DOMAIN is localhost, http://localhost:PORT
+      # if SERVER_DOMAIN is not localhost, need to also up-proxy - https://SERVER_DOMAIN
+      server_domain=$(load_arg "SERVER_DOMAIN")
+      port=$(load_arg "PORT")
+      if [ "$server_domain" = "localhost" ]; then
+        echo "➡️  Your site is available at: $(color_text secondary "http://localhost:$port")"
+      else
+        echo "➡️  Your site will be available at: $(color_text secondary "https://$server_domain")"
+        echo "➡️  Running 'rl up-proxy' to set up the proxy."
+        ./run-local up-proxy
+        echo "➡️  Your site is available at: $(color_text secondary "https://$server_domain")"
+      fi
+
       ;;
 
     up-foreground)
-      sync_defaults_to_args
-      compile_templates true # prompt to compile
+      compile_templates true
       copy_conf_files_to_computed
       echo "Starting containers in foreground..."
       $(docker_compose_cmd) -p "$DOCKER_PROJECT" -f "$COMPOSE_FILE" up --build
       ;;
 
     build)
-      sync_defaults_to_args
-      compile_templates false # force compile
+      compile_templates false
       copy_conf_files_to_computed
       echo "Building containers..."
       $(docker_compose_cmd) -p "$DOCKER_PROJECT" -f "$COMPOSE_FILE" build

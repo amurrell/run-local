@@ -676,14 +676,9 @@ case $1 in
 
     # grep /etc/hosts for $DEFAULT_SERVER_DOMAIN, if not found, suggest adding it with a command
     if ! grep -q "$DEFAULT_SERVER_DOMAIN" /etc/hosts; then
-      step_text "👉 $DEFAULT_SERVER_DOMAIN not found in /etc/hosts. Please add it with the following command:"
-      echo "echo '127.0.0.1 $DEFAULT_SERVER_DOMAIN' | sudo tee -a /etc/hosts"
-      step_text "Then run 'run-local up-proxy' again."
-      exit 1
+      step_text "👉 $DEFAULT_SERVER_DOMAIN not found in /etc/hosts. Editing /etc/hosts - may need sudo permission:"
+      echo "127.0.0.1 $DEFAULT_SERVER_DOMAIN" | sudo tee -a /etc/hosts
     fi
-
-    # do 'run-local up'
-    ./run-local up
 
     # exec the RL_PROXY docker-compose
     step_text "Running rl-proxy docker-compose"
