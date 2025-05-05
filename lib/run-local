@@ -1,16 +1,5 @@
 #!/usr/bin/env bash
 
-## RUN LOCAL SCRIPT
-# This script is intended to be run from the root of a project repository.
-# It is a wrapper script to run commands in the DockerLocal environment (for now).
-# Alter your project's values in rl-vars to customize the script for your project.
-
-# To add to a project (1x setup):
-# - [README.md](https://github.com/amurrell/run-local/blob/main/README.md)
-# Customize & share with your team:
-# - [README-TEMPLATE.md](https://github.com/amurrell/run-local/blob/main/README-TEMPLATE.md)
-
-#### The scripts run-local and rl-alias are meant to stay free of customization so they can be updated easily.
 #### 👉 Customize your project in rl-vars, rl-extended and rl-funcs/rl-* files.
 
 # Save the initial directory where the script was executed
@@ -133,6 +122,9 @@ if EXTENDED_FILE=$(find_rl_file "$RL_EXTENDED_FILE_NAME"); then
   source "$EXTENDED_FILE"
 fi
 
+DETECT_DEV_FOLDER=$(dirname "$INITIAL_DIR")
+RL_PROXY="$DETECT_DEV_FOLDER/rl-proxy"
+
 check_file() {
   local file=$1
   # default to false
@@ -191,13 +183,19 @@ check_alias() {
 # ==== Command List (name|description) ====
 
 COMMANDS=(
-  "up|Start the site"
-  "down|Stop the site"
+  "up|Start the site containers (in background)"
+  "up-foreground|Start the site containers (in foreground)"
+  "up-proxy|Start the site containers (in background) with rl-proxy"
+  "build|Build the site containers & compile config"
+  "build-proxy|Build the rl-proxy containers"
+  "down|Stop the site containers"
+  "down-proxy|Stop the rl-proxy containers"
   "ssh|Access site containers (default: web)"
   "ssh-mysql|Access MySQL container"
   "ssh-mysqlroot|Access MySQL as root"
   "ssh-web|Access web container"
   "ssh-webroot|Access web as webroot user"
+  "ssh-proxy|Access rl-proxy container"
   "logs|View all logs"
   "logs-php|View PHP logs"
   "logs-access|View nginx access logs"
@@ -325,6 +323,7 @@ show_menu() {
   pretty_option "$self_command" "install"
   pretty_option "$self_command" "npm run hot"
   pretty_option "$self_command" "ssh"
+  pretty_option "$self_command" "ssh-web ls -al"
   pretty_option "$self_command" "logs"
   pretty_option "$self_command" "db"
   pretty_option "$self_command" "db-query \"show tables;\""
@@ -340,8 +339,8 @@ show_menu() {
   check_function show_help_extended && show_help_extended
   echo ""
   echo " Running Project: ${PROJECT_NAME:-my-project}"
-  echo " Running on Port: ${PORT:-3030}"
-  echo " Using Database: ${DB_NAME:-default_db}"
+  echo " Running on Port: ${DEFAULT_PORT:-3030}"
+  echo " Using Database: ${DEFAULT_DB_NAME:-default_db}"
   echo ""
 
   read -rp "Enter option by # or command to execute (enter to quit): " choice
@@ -411,7 +410,6 @@ setup_source_file() {
 
   if check_file "$source_file"; then
     SHELL_PROFILES=()
-    DETECT_DEV_FOLDER=$(dirname "$INITIAL_DIR")
 
     # if no alias in zsh, add to shell profiles to add
     if [ "$file_type" = "alias" ] && ! zsh -i -c 'type rl' &> /dev/null; then
@@ -615,25 +613,124 @@ run_npm_command() {
   fi
 }
 
+check_proxy() {
+  # determine "DEV_FOLDER"
+  # See if we have rl-proxy folder in DEV_FOLDER
+  if [ ! -d "$DETECT_DEV_FOLDER/rl-proxy" ]; then
+    step_text "❌ Error: rl-proxy folder not found in $DETECT_DEV_FOLDER. Please run 'run-local up-proxy' first."
+    exit 1
+  fi
+  # check if rl-proxy is running
+  if ! docker ps --format '{{.Names}}' | grep -q "rl-proxy-web-1"; then
+    if [ "$SHOW_ERROR" = true ]; then
+      echo "❌ rl-proxy container is not running. Please run 'rl up-proxy' first."
+    fi
+    return 1
+  fi
+}
+
 setup_alias
 setup_completion
 
 # Determine the script to run based on the first argument
 case $1 in
-  up|down)
+  up-proxy)
+    # if DEFAULT_SERVER_DOMAIN is not set or is localhost, error
+    if [ -z "$DEFAULT_SERVER_DOMAIN" ] || [ "$DEFAULT_SERVER_DOMAIN" = "localhost" ]; then
+      step_text "❌ Error: DEFAULT_SERVER_DOMAIN is not set or is localhost. Please set it in rl-vars. Use 'run-local up' instead."
+      exit 1
+    fi
+
+    # determine "DEV_FOLDER"
+    # see if rl-proxy folder exists in DEV_FOLDER
+    if [ -d "$RL_PROXY" ]; then
+      step_text "Found rl-proxy folder in $RL_PROXY"
+    else
+      step_text "Creating rl-proxy folder in $RL_PROXY"
+      # if it does not, set the path to the default rl-proxy
+      mkdir -p "$RL_PROXY"
+    fi
+
+    # Just do this every time, to ensure updates?
+    step_text "Copying rl-proxy docker files to $RL_PROXY - based on '$PROJECT_NAME' rl-config files"
+    cp "$REPO_ROOT/rl-config/docker/computed/Dockerfile-Proxy" "$RL_PROXY/Dockerfile-Proxy"
+    cp "$REPO_ROOT/rl-config/docker/computed/docker-compose.proxy.yml" "$RL_PROXY/docker-compose.yml"
+    cp "$REPO_ROOT/rl-config/docker/computed/nginx.proxy.conf" "$RL_PROXY/nginx.conf"
+    # maybe make a txt file in here with the source of these files
+    echo "Created by run-local, based on '$PROJECT_NAME' [$REPO_ROOT] rl-config files" > "$RL_PROXY/README.txt"
+
+    # mkdirs RL_PROXY/nginx-sites, ssl-certs
+    mkdir -p "$RL_PROXY/nginx-sites"
+    mkdir -p "$RL_PROXY/ssl-certs"
+    mkdir -p "$RL_PROXY/logs"
+
+    step_text "Copying $PROJECT_NAME nginx config to $RL_PROXY/nginx-sites/$DEFAULT_SERVER_DOMAIN.conf"
+    cp "$REPO_ROOT/rl-config/docker/computed/nginx.proxy.site.conf" "$RL_PROXY/nginx-sites/$DEFAULT_SERVER_DOMAIN.conf"
+
+    # only generate the self-signed cert if it does not exist
+    if [ ! -f "$RL_PROXY/ssl-certs/$DEFAULT_SERVER_DOMAIN-cert.pem" ]; then
+      step_text "Generating self-signed SSL certificate for $DEFAULT_SERVER_DOMAIN"
+      openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout "$RL_PROXY"/ssl-certs/"$DEFAULT_SERVER_DOMAIN"-key.pem -out "$RL_PROXY"/ssl-certs/"$DEFAULT_SERVER_DOMAIN"-cert.pem -subj "/CN=$DEFAULT_SERVER_DOMAIN"
+    fi
+
+    # grep /etc/hosts for $DEFAULT_SERVER_DOMAIN, if not found, suggest adding it with a command
+    if ! grep -q "$DEFAULT_SERVER_DOMAIN" /etc/hosts; then
+      step_text "👉 $DEFAULT_SERVER_DOMAIN not found in /etc/hosts. Please add it with the following command:"
+      echo "echo '127.0.0.1 $DEFAULT_SERVER_DOMAIN' | sudo tee -a /etc/hosts"
+      step_text "Then run 'run-local up-proxy' again."
+      exit 1
+    fi
+
+    # do 'run-local up'
+    ./run-local up
+
+    # exec the RL_PROXY docker-compose
+    step_text "Running rl-proxy docker-compose"
+    docker-compose -f "$RL_PROXY/docker-compose.yml" up --build -d
+    step_text "✅ Proxy started. Visit https://$DEFAULT_SERVER_DOMAIN"
+    ;;
+  ssh-proxy)
+    # if check_proxy
+    if check_proxy; then
+      step_text "Running rl-proxy ssh command"
+      docker-compose -f "$RL_PROXY/docker-compose.yml" exec -it web bash
+    else
+      step_text "❌ Proxy is not running. Run 'run-local up-proxy' to start it."
+      exit 1
+    fi
+    ;;
+  build-proxy)
+    step_text "Re-compiling, via 'run-local up', first"
+    # to make sure that the files all get compiled first.
+    ./run-local up
+    # now run the build command
+    step_text "Running rl-proxy build command"
+    docker-compose -f "$RL_PROXY/docker-compose.yml" build --no-cache
+    ;;
+  down-proxy)
+    # if check_proxy
+    if check_proxy; then
+      step_text "Running rl-proxy down command"
+      docker-compose -f "$RL_PROXY/docker-compose.yml" down
+    else
+      step_text "❌ Proxy is not running. Run 'run-local up-proxy' to start it."
+      exit 1
+    fi
+    ;;
+  up|down|build|up-foreground)
     rl_docker "$1" "${@:2}"
     exit $?
     ;;
   logs|logs-php|logs-access|logs-error|logs-xdebug)
-    rl_docker "logs" "$1" "${@:2}"
+    rl_docker "$1" "${@:2}"
     exit $?
     ;;
   ssh|ssh-web|ssh-webroot|ssh-mysql|ssh-mysqlroot)
-    rl_docker "ssh" "$1" "${@:2}"
+    rl_docker "$1" "${@:2}"
     exit $?
     ;;
   db|db-create|db-query|db-import|db-export|db-remove|db-list)
-    rl_docker "db" "$1" "${@:2}"
+    rl_docker "$1" "${@:2}"
     exit $?
     ;;
   npm)

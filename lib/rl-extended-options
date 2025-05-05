@@ -10,8 +10,8 @@ show_help_extended() {
   make_extended_option "artisan"      "debug-artisan  " "· Run an Artisan command with Xdebug enabled (port $XDEBUG_CLI_PORT)"
   make_extended_option "tinker"       "tinker         " "· Run Tinker (Laravel REPL)"
   make_extended_option "tinker"       "debug-tinker   " "· Run Tinker with Xdebug enabled (port $XDEBUG_CLI_PORT)"
-  make_extended_option "assets"       "assets-download" ". Download assets folder via ssh into tar.gz in DockerLocal/data"
-  make_extended_option "assets"       "assets         " ". Checks DockerLocal/data for .tar.gz files, swaps/backs up current uploads"
+  make_extended_option "assets"       "assets-download" ". Download assets folder via ssh into tar.gz in rl/docker/data"
+  make_extended_option "assets"       "assets         " ". Checks rl/docker/data for .tar.gz files, swaps/backs up current uploads"
   echo ""
 }
 

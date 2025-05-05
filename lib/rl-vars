@@ -5,6 +5,8 @@ PROJECT_NAME="🐣 YOUR PROJECT"
 
 # rl-var: Port to use for localhost - PORT
 DEFAULT_PORT="3041"
+# rl-var: Server Domain name (eg. yoursite.com) - DOMAIN
+DEFAULT_SERVER_DOMAIN="localhost"
 # rl-var: Database name in the container - DB_NAME
 DEFAULT_DB_NAME="rl_db"
 # rl-var: Web server root - where your app (in repo root) eg. html or app/public - WEB_SERVER_ROOT
@@ -15,8 +17,10 @@ DEFAULT_PHP_VERSION="8.4"
 DEFAULT_NVM_VERSION="22.14.0"
 # rl-var: Default database image to use (in Dockerfile - can be mariadb or mysql) - DB_IMAGE
 DEFAULT_DB_IMAGE="mariadb:11.4"
-# rl-var: app (package.json) location (if repo root, would be blank) - APP_PATH
+# rl-var: App (package.json) location (if repo root, would be blank) - APP_PATH
 DEFAULT_APP_PATH=""
+# rl-var: Logs folder - where to store logs (in repo) - DEFAULT_LOGS_FOLDER
+DEFAULT_LOGS_FOLDER="rl/logs"
 # rl-var: Unique to your package.json - what's the command to start your app, locally? NPM_COMMAND
 DEFAULT_NPM_COMMAND="npm run dev"
 # rl-var: DB password, leave simple for local dev (in rl, the user is root by default) - DB_PASSWORD
@@ -27,6 +31,8 @@ APP_ENV_FILE=".env"
 APP_ENV_EXAMPLE_FILE=".env.example"
 # rl-var: X Debug CLI port - this is the port used for xdebug when running from CLI - XDEBUG_CLI_PORT
 XDEBUG_CLI_PORT=9002
+# rl-var: Does your project use pm2 (eg. for laravel horizon, queues, scheduler) - true|false - PM2
+USE_PM2=false
 
 # rl-extended-options variables
 
@@ -48,6 +54,7 @@ export ASSETS_DOWNLOAD_PATH
 # Export all variables
 
 export PROJECT_NAME
+export DEFAULT_SERVER_DOMAIN
 export DEFAULT_PORT
 export DEFAULT_DB_NAME
 export DEFAULT_WEB_SERVER_ROOT
@@ -55,8 +62,10 @@ export DEFAULT_PHP_VERSION
 export DEFAULT_NVM_VERSION
 export DEFAULT_DB_IMAGE
 export DEFAULT_APP_PATH
+export DEFAULT_LOGS_FOLDER
 
 export XDEBUG_CLI_PORT
+export USE_PM2
 
 export DEFAULT_NPM_COMMAND
 export DEFAULT_DB_PASSWORD

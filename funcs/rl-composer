@@ -2,11 +2,10 @@
 
 run_composer_command() {
   step_text "Run a Composer command in the web container."
-  # if the user has passed in a command (the first variable passed to this function), use that
-  # otherwise, prompt the user for a command
-  if [ -n "$1" ]; then
-    composer_command="$1"
-  else
+
+  local composer_command="$1"
+
+  if [ -z "$composer_command" ]; then
     read -rp "Enter the Composer command you want to run (e.g., 'install', 'update', 'require vendor/package'): " composer_command
   fi
 
@@ -17,7 +16,8 @@ run_composer_command() {
   fi
 
   step_text "Running 'composer $composer_command' inside the web container..."
-  (cd "$COMMANDS_DIR" && ./site-ssh -h=web -c="cd /var/www/site && composer $composer_command")
+  local CMD="cd /var/www/site && composer $composer_command"
+  ./run-local ssh-web "$CMD"
 
   step_text "✅ Composer command executed."
 }

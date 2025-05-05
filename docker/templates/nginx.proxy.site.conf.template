@@ -1,0 +1,85 @@
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${SERVER_DOMAIN};
+
+    access_log /var/www/site/${LOGS_FOLDER}/access.log;
+    error_log  /var/www/site/${LOGS_FOLDER}/error.log info;
+
+    location / {
+
+        proxy_connect_timeout       600;
+        proxy_send_timeout          600;
+        proxy_read_timeout          600;
+        send_timeout                600;
+
+        proxy_pass         http://host.docker.internal:${PORT};
+        proxy_redirect     off;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Host $server_name;
+
+    }
+
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443;
+    ssl_verify_client off;
+    server_name ${SERVER_DOMAIN};
+
+    access_log /var/www/site/${LOGS_FOLDER}/access.log;
+    error_log  /var/www/site/${LOGS_FOLDER}/error.log info;
+
+    location / {
+
+        proxy_connect_timeout          600;
+        proxy_send_timeout             600;
+        proxy_read_timeout             600;
+        send_timeout                   600;
+
+        proxy_pass                     http://host.docker.internal:${PORT};
+        proxy_redirect                 off;
+        proxy_set_header               Host $host;
+        proxy_set_header               X-Real-IP $remote_addr;
+        proxy_set_header               X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header               X-Forwarded-Host $server_name;
+
+        proxy_set_header               Upgrade $http_upgrade;
+        proxy_set_header               Connection "upgrade";
+        proxy_http_version             1.1;
+        proxy_ssl_verify               off;
+        proxy_ssl_protocols            SSLv3 TLSv1 TLSv1.1 TLSv1.2;
+        proxy_ssl_ciphers              ALL;
+        proxy_ssl_session_reuse        off;
+
+    }
+
+    ssl_certificate      /var/www/site/${SSL_CERTS_FOLDER}/${SERVER_DOMAIN}-cert.pem;
+    ssl_certificate_key  /var/www/site/${SSL_CERTS_FOLDER}/${SERVER_DOMAIN}-key.pem;
+}
+
+server {
+    server_name socket.${SERVER_DOMAIN};
+
+    access_log /var/www/site/${LOGS_FOLDER}/access.log;
+    error_log  /var/www/site/${LOGS_FOLDER}/error.log info;
+
+    location / {
+
+        proxy_connect_timeout       600;
+        proxy_send_timeout          600;
+        proxy_read_timeout          600;
+        send_timeout                600;
+
+        proxy_pass         https://host.docker.internal:${PORT};
+        proxy_redirect     off;
+        proxy_set_header   Host $host;
+        proxy_set_header   X-Real-IP $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Host $server_name;
+
+    }
+}

@@ -5,8 +5,14 @@ echo "🔧 Installing run-local..."
 
 # Clone run-local if needed
 if [ ! -d "rl" ]; then
-  echo "📥 Cloning run-local core files..."
-  git clone --depth=1 https://github.com/amurrell/run-local rl
+  if [ -d ".git" ]; then
+    echo "📥 Adding run-local as a Git submodule..."
+    git submodule add https://github.com/amurrell/run-local rl
+    git submodule update --init --recursive
+  else
+    echo "📥 Cloning run-local (no .git found, skipping submodule)..."
+    git clone --depth=1 https://github.com/amurrell/run-local rl
+  fi
 else
   echo "✅ 'rl' directory already exists."
 fi
@@ -14,6 +20,8 @@ fi
 mkdir -p rl-config
 
 EXTENDED_OPTIONS_FILE="rl-extended-options"
+DOCKER_CONF_FOLDER="rl/docker/conf"
+DOCKER_CONF_FOLDER_COPY="rl-config/docker/conf"
 ORIGINAL_VARS_FILE="rl/lib/rl-vars"
 NEW_VARS_FILE="rl-config/rl-vars"
 TMP_PROMPTS="/tmp/rl-vars-prompt.$$"
@@ -45,7 +53,7 @@ while IFS= read -r desc <&3 && IFS= read -r keyval <&3; do
   key=$(echo "$keyval" | cut -d= -f1)
   raw_val=$(echo "$keyval" | cut -d= -f2- | sed 's/^["'\'']//; s/["'\'']$//')
 
-  printf "%s [%s]: " "$desc" "$raw_val"
+  printf "%s [%s]: " "· $desc" "$raw_val"
   read user_input
   user_input="${user_input:-$raw_val}"
 
@@ -73,6 +81,15 @@ echo "✅ Created rl-config/rl-vars with customized values."
 if [ ! -f "rl-config/$EXTENDED_OPTIONS_FILE" ]; then
   cp "rl/lib/$EXTENDED_OPTIONS_FILE" "rl-config/$EXTENDED_OPTIONS_FILE"
   echo "✅ Copied default $EXTENDED_OPTIONS_FILE"
+fi
+
+# Copy DOCKER_CONF_FOLDER contents to DOCKER_CONF_FOLDER_COPY
+if [ ! -d "$DOCKER_CONF_FOLDER_COPY" ]; then
+  mkdir -p "$DOCKER_CONF_FOLDER_COPY"
+  cp -r "$DOCKER_CONF_FOLDER"/* "$DOCKER_CONF_FOLDER_COPY"
+  echo "✅ Copied $DOCKER_CONF_FOLDER to $DOCKER_CONF_FOLDER_COPY"
+else
+  echo "✅ $DOCKER_CONF_FOLDER_COPY already exists."
 fi
 
 # Create launcher if missing

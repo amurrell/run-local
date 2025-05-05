@@ -10,5 +10,11 @@ module.exports = {
       watch: false,
       max_restarts: 10,
     },
+    {
+      name: "scheduler",
+      script: "php",
+      args: "artisan schedule:run",
+      cron_restart: "* * * * *",
+    },
   ],
 };
