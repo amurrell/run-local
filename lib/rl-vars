@@ -3,8 +3,13 @@
 # rl-var: Display name of your project
 PROJECT_NAME="🐣 YOUR PROJECT"
 
+# Notes:
+# - DEFAULT prefix vars will get copied to rl-config/args to enable easy overriding
+#   but you manually create any other overrides in rl-config/args
+# - The rl-var: <description> - <VAR> syntax is read by the rl-installer to prompt for values upon first time setup.
+
 # rl-var: Port to use for localhost - PORT
-DEFAULT_PORT="3041"
+DEFAULT_PORT="3000"
 # rl-var: Server Domain name (eg. yoursite.com) - DOMAIN
 DEFAULT_SERVER_DOMAIN="localhost"
 # rl-var: Database name in the container - DB_NAME
@@ -14,7 +19,7 @@ DEFAULT_WEB_SERVER_ROOT="html"
 # rl-var: Default PHP version to use (in Dockerfile) - PHP_VERSION
 DEFAULT_PHP_VERSION="8.4"
 # rl-var: Default NVM version to use (in Dockerfile) - NVM_VERSION
-DEFAULT_NVM_VERSION="22.14.0"
+DEFAULT_NVM_VERSION="22.15.0"
 # rl-var: Default database image to use (in Dockerfile - can be mariadb or mysql) - DB_IMAGE
 DEFAULT_DB_IMAGE="mariadb:11.4"
 # rl-var: App (package.json) location (if repo root, would be blank) - APP_PATH
@@ -29,8 +34,10 @@ DEFAULT_DB_PASSWORD="1234"
 APP_ENV_FILE=".env"
 # rl-var: Your project's .env.example file - relative to repo root - ENV_EXAMPLE_FILE
 APP_ENV_EXAMPLE_FILE=".env.example"
-# rl-var: X Debug CLI port - this is the port used for xdebug when running from CLI - XDEBUG_CLI_PORT
-XDEBUG_CLI_PORT=9002
+# rl-var: X Debug Port - this is the port used for xdebug when running from browser - DEBUG_PORT
+DEFAULT_DEBUG_PORT=9002
+# rl-var: X Debug CLI port - this is the port used for xdebug when running from CLI - DEBUG_CLI_PORT
+DEFAULT_DEBUG_CLI_PORT=9003
 # rl-var: Does your project use pm2 (eg. for laravel horizon, queues, scheduler) - true|false - PM2
 USE_PM2=false
 
@@ -63,8 +70,9 @@ export DEFAULT_NVM_VERSION
 export DEFAULT_DB_IMAGE
 export DEFAULT_APP_PATH
 export DEFAULT_LOGS_FOLDER
+export DEFAULT_DEBUG_CLI_PORT
+export DEFAULT_DEBUG_PORT
 
-export XDEBUG_CLI_PORT
 export USE_PM2
 
 export DEFAULT_NPM_COMMAND

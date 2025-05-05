@@ -101,12 +101,15 @@ Requires:
 First time setup:
 
 ```
+# via curl
 cd your-project-folder
-curl -s https://raw.githubusercontent.com/amurrell/run-local/main/lib/rl-installer | bash
+curl -O https://raw.githubusercontent.com/amurrell/run-local/main/lib/rl-installer
+bash rl-installer
 
-# or wget
+# via wget
 cd your-project-folder
-wget -qO- https://raw.githubusercontent.com/amurrell/run-local/main/lib/rl-installer | bash
+wget https://raw.githubusercontent.com/amurrell/run-local/main/lib/rl-installer
+bash rl-installer
 ```
 
 See the `run-local/lib/README-TEMPLATE.md` for a readme based on a configured run-local project.
@@ -128,7 +131,7 @@ The `rl-config` folder contains the following folders and files:
 
 ### Docker & Proxy
 
-If your project has a `rl_config` folder, you can easily get started by just running `rl up` or `rl up-foreground` to start the containers. If your project is using a domain other than `localhost` then you use `rl up-proxy` to start the containers with the proxy. This will automatically set up the proxy for you, so you can access your project at `https://yourproject.com` or `http://yourproject.com`.
+If your project has a `rl-config` folder, you can easily get started by just running `rl up` or `rl up-foreground` to start the containers. If your project is using a domain other than `localhost` then you use `rl up-proxy` to start the containers with the proxy. This will automatically set up the proxy for you, so you can access your project at `https://yourproject.com` or `http://yourproject.com`.
 
 ### rl alias
 
