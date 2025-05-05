@@ -211,6 +211,8 @@ COMMANDS=(
   "npm|Run an npm command"
   "install|First-time setup - 🧐 Is this your first run? Start here!"
   "help|Show this help menu"
+  "upgrade|Upgrade rl submodule to latest version (main branch)"
+  "update|Update rl submodule, recursively"
   "list|List run-local scripts"
   "cd|cd to your project folder"
 )
@@ -744,6 +746,39 @@ case $1 in
     ;;
   help)
     show_menu
+    exit 0
+    ;;
+  upgrade)
+    step_text "Upgrading rl repository... (pull main branch)"
+    cd "$REPO_ROOT/rl" || (echo "❌ Error: Could not change to rl directory." && exit 1)    # check if we are on the main branch
+    current_branch=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$current_branch" != "main" ]; then
+      step_text "❌ Error: You are not on the main branch. Please switch to the main branch and try again."
+      exit 1
+    fi
+    step_text "Checking out main branch..."
+    if ! git fetch origin main; then
+      step_text "❌ Error: Could not fetch main branch."
+      exit 1
+    fi
+    step_text "Pulling latest changes..."
+    if ! git checkout main; then
+      step_text "❌ Error: Could not checkout main branch."
+      exit 1
+    fi
+    if ! git pull origin main; then
+      step_text "❌ Error: Could not pull latest changes."
+      exit 1
+    fi
+    ./run-local update
+    ;;
+  update)
+    step_text "Updating rl submodule..."
+    if ! git submodule update --init --recursive; then
+      step_text "❌ Error: Could not update submodules."
+      exit 1
+    fi
+    step_text "✅ rl updated successfully."
     exit 0
     ;;
   list)
