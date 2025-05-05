@@ -1,0 +1,72 @@
+{
+  auto_https off
+
+  # Enable FrankenPHP-specific directives (requires a FrankenPHP build)
+  frankenphp
+
+  log {
+    output stderr
+    level INFO
+  }
+}
+
+${PROTOCOL}://${SERVER_DOMAIN} {
+
+  root * /var/www/site/${WEB_SERVER_ROOT}
+
+  # Block sensitive paths
+  handle_path /.env {
+    respond "Access denied" 403
+  }
+  handle_path /storage/logs/* {
+    respond "Access denied" 403
+  }
+  handle_path /vendor/* {
+    respond "Access denied" 403
+  }
+  handle_path /composer.lock {
+    respond "Access denied" 403
+  }
+  handle_path /package-lock.json {
+    respond "Access denied" 403
+  }
+
+  # Cache headers for static assets
+  @staticFiles {
+    path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.woff *.webp *.svg
+  }
+  header @staticFiles Cache-Control "public, max-age=31536000"
+
+  # Security & CORS headers
+  header {
+    Access-Control-Allow-Origin "*"
+    Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    Access-Control-Allow-Credentials "true"
+    Access-Control-Allow-Headers "Accept,Authorization,Content-Type,X-Requested-With,Origin,X-Api-Key,X-CSRF-Token,X-Client-Url,Cache-Control"
+    X-Frame-Options "DENY"
+    X-Content-Type-Options "nosniff"
+    X-XSS-Protection "1; mode=block"
+  }
+
+  encode zstd gzip br
+  file_server
+
+  # Laravel-style routing
+  route {
+    try_files {path} {path}/ /index.php?{query}
+    php_server
+  }
+
+  # Health check endpoint
+  @health path /health
+  respond @health 200 {
+    body "ok"
+    close
+  }
+
+  log {
+    output stdout
+    output file /var/www/site/${LOGS_FOLDER}/access.log
+    level INFO
+  }
+}

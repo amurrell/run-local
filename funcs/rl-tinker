@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+run_tinker_command() {
+  local CMD="cd /var/www/site && php artisan tinker"
+  ./run-local ssh-web "$CMD"
+}
+
+run_debug_tinker_command() {
+  local CMD="cd /var/www/site && XDEBUG_MODE=debug XDEBUG_CONFIG='client_port=$XDEBUG_CLI_PORT' php artisan tinker"
+  ./run-local ssh-web "$CMD"
+}

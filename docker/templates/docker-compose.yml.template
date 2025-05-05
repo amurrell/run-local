@@ -1,0 +1,68 @@
+version: "3"
+services:
+  web:
+    build:
+      context: ./
+      dockerfile: ${DOCKERFILE}
+    volumes:
+      - ../../../:/var/www/site
+      - ../../../rl/docker/data/caddy_data:/data
+      - ../../../rl/docker/data/caddy_config:/config
+    expose:
+      - "80"
+      - "443"
+      - "6001"
+    networks:
+      - rl-net
+    depends_on:
+      - mysql
+      - memcached
+      - redis
+    environment:
+      - REDIS_URL=redis://redis
+    ports:
+      - "${WEB_PORT}:80"
+      - "${SSL_PORT}:443"
+      - "${SOCKET_PORT}:6001"
+    extra_hosts:
+      - "${SERVER_DOMAIN}:127.0.0.1"
+
+  mysql:
+    image: ${DB_IMAGE}
+    restart: always
+    ports:
+      - "${MYSQL_PORT}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ../../../rl/docker/data/dumps:/docker-entrypoint-initdb.d
+      - ../../../rl/docker/data/custom:/etc/mysql/conf.d
+      - mysql-data-${WEB_PORT}:/var/lib/mysql
+    networks:
+      - rl-net
+
+  memcached:
+    image: memcached
+    restart: always
+    ports:
+      - "${MEMCACHED_PORT}:11211"
+    networks:
+      - rl-net
+
+  redis:
+    image: redis
+    restart: always
+    ports:
+      - "${REDIS_PORT}:6379"
+    networks:
+      - rl-net
+
+volumes:
+  mysql-data-${WEB_PORT}:
+
+networks:
+  rl-net:
+    driver: bridge

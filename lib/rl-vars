@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+# rl-var: Display name of your project
+PROJECT_NAME="🐣 YOUR PROJECT"
+
+# rl-var: Port to use for localhost - PORT
+DEFAULT_PORT="3041"
+# rl-var: Server Domain name (eg. yoursite.com) - DOMAIN
+DEFAULT_SERVER_DOMAIN="localhost"
+# rl-var: Database name in the container - DB_NAME
+DEFAULT_DB_NAME="rl_db"
+# rl-var: Web server root - where your app (in repo root) eg. html or app/public - WEB_SERVER_ROOT
+DEFAULT_WEB_SERVER_ROOT="html"
+# rl-var: Default PHP version to use (in Dockerfile) - PHP_VERSION
+DEFAULT_PHP_VERSION="8.4"
+# rl-var: Default NVM version to use (in Dockerfile) - NVM_VERSION
+DEFAULT_NVM_VERSION="22.14.0"
+# rl-var: Default database image to use (in Dockerfile - can be mariadb or mysql) - DB_IMAGE
+DEFAULT_DB_IMAGE="mariadb:11.4"
+# rl-var: App (package.json) location (if repo root, would be blank) - APP_PATH
+DEFAULT_APP_PATH=""
+# rl-var: Logs folder - where to store logs (in repo) - DEFAULT_LOGS_FOLDER
+DEFAULT_LOGS_FOLDER="rl/logs"
+# rl-var: Unique to your package.json - what's the command to start your app, locally? NPM_COMMAND
+DEFAULT_NPM_COMMAND="npm run dev"
+# rl-var: DB password, leave simple for local dev (in rl, the user is root by default) - DB_PASSWORD
+DEFAULT_DB_PASSWORD="1234"
+# rl-var: Your project's .env file - relative to repo root - ENV_FILE
+APP_ENV_FILE=".env"
+# rl-var: Your project's .env.example file - relative to repo root - ENV_EXAMPLE_FILE
+APP_ENV_EXAMPLE_FILE=".env.example"
+# rl-var: X Debug CLI port - this is the port used for xdebug when running from CLI - XDEBUG_CLI_PORT
+XDEBUG_CLI_PORT=9002
+# rl-var: Does your project use pm2 (eg. for laravel horizon, queues, scheduler) - true|false - PM2
+USE_PM2=false
+
+# rl-extended-options variables
+
+# rl-assets
+ASSETS_SSH_SERVER='root@hostname' # to be used with ssh & scp (use ssh config to make this easier)
+ASSETS_SSH_SERVER_SOURCE_DIR='/var/www/yourproject.com/wp-content/uploads'
+ASSETS_FILE='rl-assets-download'  # we will append a timestamp, tar.gz
+ASSETS_LOCAL_PATH="$REPO_ROOT/html/wp-content/uploads"
+ASSETS_DOWNLOAD_PATH="$DATA_DUMPS_DIR/$ASSETS_FILE"
+
+# Export rl-extended variables
+
+export ASSETS_SSH_SERVER
+export ASSETS_SSH_SERVER_SOURCE_DIR
+export ASSETS_FILE
+export ASSETS_LOCAL_PATH
+export ASSETS_DOWNLOAD_PATH
+
+# Export all variables
+
+export PROJECT_NAME
+export DEFAULT_SERVER_DOMAIN
+export DEFAULT_PORT
+export DEFAULT_DB_NAME
+export DEFAULT_WEB_SERVER_ROOT
+export DEFAULT_PHP_VERSION
+export DEFAULT_NVM_VERSION
+export DEFAULT_DB_IMAGE
+export DEFAULT_APP_PATH
+export DEFAULT_LOGS_FOLDER
+
+export XDEBUG_CLI_PORT
+export USE_PM2
+
+export DEFAULT_NPM_COMMAND
+export DEFAULT_DB_PASSWORD
+
+export APP_ENV_FILE
+export APP_ENV_EXAMPLE_FILE

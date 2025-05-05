@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+prompt_artisan_command() {
+  if [ -z "$2" ]; then
+    read -rp "Enter the Artisan command you want to run (e.g., 'route:list'): " ARTISAN_COMMAND
+    if [ -z "$ARTISAN_COMMAND" ]; then
+      step_text "No command entered. Returning to menu."
+      show_menu
+      exit 0
+    fi
+    run_artisan_command "$ARTISAN_COMMAND"
+    exit 0
+  fi
+}
+
+run_artisan_command() {
+  local CMD="cd /var/www/site && php artisan $1"
+  ./run-local ssh-web "$CMD"
+}
+
+run_debug_artisan_command() {
+  local CMD="cd /var/www/site && XDEBUG_MODE=debug XDEBUG_CONFIG='client_port=$XDEBUG_CLI_PORT' php artisan $1"
+  ./run-local ssh-web "$CMD"
+}

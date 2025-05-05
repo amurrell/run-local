@@ -3,22 +3,20 @@
 This repository is:
 
 - A website or API most likely: [yourproject.com](https://yourproject.com)
-- It is using [DockerLocal](https://github.com/amurrell/DockerLocal) for local containerization
-- It is using [run-local](https://github.com/amurrell/run-local) for enjoyable local development
+- It is using [run-local](https://github.com/amurrell/run-local) for enjoyable local development + generating docker build files.
 
 ## Local Development Install
 
 ### Requirements
 
 - Docker Desktop ([install docs](https://docs.docker.com/desktop/))
-- If using [ProxyLocal](https://github.com/amurrell/ProxyLocal), add to `sites.yml`: `<PORT>: docker.yourproject.com`
 - **nvm** - Node Version Manager
 - You have access to `env` variables for the project (eg. check password manager)
-- You have an `sql` dump of the database you want to use (check file storage)
+- You have an `sql` dump of the database you want to use (check file storage), if using a database
 
 ### Steps
 
-1. Clone this repository, ideally at same level as `ProxyLocal` (if using ProxyLocal)
+1. Clone this repository, ideally in a `code` folder in your home directory
 
    ```bash
    git clone git@github.com/PROJECTOWNER/YOURPROJECT.git
@@ -26,7 +24,7 @@ This repository is:
 
 1. `cd YOURPROJECT`
 1. `./run-local.sh install` & follow prompts!
-1. Visit http://localhost:PORT and/or http://docker.yourproject.com
+1. Visit http://localhost:PORT and/or https://yourproject.com - whichever is set up.
 1. Open a new terminal window and run `rl` to test alias works.
 
 ---
@@ -91,8 +89,8 @@ When using the `rl` alias outside of your run-local repos, you can quickly jump 
 Available run-local scripts: in /Users/angela/code
 
 1) angelamurrell
-2) verticolabs
-3) run-local
+2) run-local
+3) another-project
 
 Select a run-local script to execute: 1
 

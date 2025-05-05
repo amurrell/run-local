@@ -1,0 +1,14 @@
+# Ignore Git metadata
+.git
+.gitignore
+
+# Local development tools
+rl/
+rl-config/
+run-local
+
+# OS / editor files
+.DS_Store
+*.swp
+*.swo
+*.bak

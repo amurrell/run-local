@@ -26,7 +26,7 @@ rl() {
     while IFS= read -r script; do
       RUN_LOCAL_SCRIPTS+=("$script")  # Append correctly for Bash & Zsh
       # needs to be a file
-    done < <(find "$RL_DEV_FOLDER" -maxdepth 3 -name 'run-local' -type f)
+    done < <(find "$RL_DEV_FOLDER" -maxdepth 3 -name 'run-local' \( -type f -o -type l \))
   fi
 
   # If no run-local scripts are found, print an error message and exit

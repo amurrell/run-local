@@ -1,0 +1,38 @@
+# Run Local files #
+######################
+*.*
+!.gitkeep
+!.gitignore
+!.gitmodules
+!README.md
+!**/*.md
+
+# Docker Caddy #
+**/caddy_*/*
+!**/caddy_config/.gitkeep
+!**/caddy_data/.gitkeep
+
+# Docker templates #
+!**/templates/*.template
+
+# Docker Conf
+!**/php.custom.ini
+!**/xdebug.custom.ini
+!**/ecosystem.config.js
+
+# Docker Data, Dumps, and Custom
+!**/data/custom/options.cnf
+**/dumps/*
+!**/dumps/.gitkeep
+**/custom/*
+!**/custom/.gitkeep
+!**/custom/options.cnf
+
+**/mysql/*
+!**/mysql/.gitkeep
+
+# OS generated files #
+######################
+.DS_Store*
+ehthumbs.db
+Thumbs.db
