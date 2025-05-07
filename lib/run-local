@@ -555,7 +555,18 @@ install() {
   fi
 
   step_text "✅ Installation complete! The environment is ready to use."
-  printf "=== Visit the site at \e[32mhttp://localhost:%s\e[0m\n\n" "$DEFAULT_PORT"
+  site_running_at
+}
+
+site_running_at() {
+  step_text "✅ Installation complete! The environment is ready to use."
+  # if DEFAULT_SERVER_DOMAIN is localhost:
+  if [[ "$DEFAULT_SERVER_DOMAIN" == "localhost" ]]; then
+    printf "=== Visit the site at \e[32mhttp://localhost:%s\e[0m\n\n" "$DEFAULT_PORT"
+  else
+    # if DEFAULT_SERVER_DOMAIN is not localhost:
+    printf "=== Visit the site at \e[32mhttps://%s\e[0m\n\n" "$DEFAULT_SERVER_DOMAIN"
+  fi
 }
 
 run_npm_command() {

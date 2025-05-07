@@ -75,7 +75,7 @@ RUN cp /etc/skel/.bashrc /var/www/.bashrc
 RUN mkdir ${SITE_PATH}
 
 # Fix known issues with frankenphp - with php-cgi for php artisan commands
-RUN ln -sf /usr/local/bin/php-cgi /usr/local/bin/php
+# RUN ln -sf /usr/local/bin/php-cgi /usr/local/bin/php
 
 # # Install Composer
 # RUN curl -sS https://getcomposer.org/installer | php && \
@@ -98,7 +98,12 @@ COPY ecosystem.config.js /var/www/ecosystem.config.js
 # Adjust UID for host match (optional)
 RUN usermod -u 1000 www-data
 
+# Set ownership on working dir
+RUN chown -R www-data:www-data /var/www/
+
 USER www-data
+
+RUN git config --global --add safe.directory /var/www/site
 
 # Run pm2 start if ecosystem file exists
 ENV USE_PM2=${USE_PM2}

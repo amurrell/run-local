@@ -68,11 +68,17 @@ sync_defaults_to_args() {
 
 compute_ports() {
   BASE_PORT=$(load_arg "PORT")
+  # shellcheck disable=SC2034
   WEB_PORT="$BASE_PORT"
+  # shellcheck disable=SC2034
   SSL_PORT=$((443 + BASE_PORT))
+  # shellcheck disable=SC2034
   SOCKET_PORT=$((6001 + BASE_PORT))
+  # shellcheck disable=SC2034
   MYSQL_PORT=$((3306 + BASE_PORT))
+  # shellcheck disable=SC2034
   MEMCACHED_PORT=$((11211 + BASE_PORT))
+  # shellcheck disable=SC2034
   REDIS_PORT=$((6379 + BASE_PORT))
 }
 
@@ -215,8 +221,8 @@ db_import() {
     echo "ℹ️ No SQL file provided. Checking $DATA_DUMPS_DIR..."
     local sql_files=("$DATA_DUMPS_DIR"/*.sql)
 
-    if [ ${#sql_files[@]} -eq 0 ]; then
-      echo "❌ No .sql files found in $DATA_DUMPS_DIR."
+    if [ ${#sql_files[@]} -eq 0 ] || [ ! -e "${sql_files[0]}" ]; then
+      echo "ℹ️ No .sql files found in $DATA_DUMPS_DIR either."
       return 1
     elif [ ${#sql_files[@]} -eq 1 ]; then
       SQL_FILE=$(basename "${sql_files[0]}")
@@ -352,6 +358,14 @@ rl_docker() {
   # or mysql:8.0.33)
   mysql_cmd=${DB_IMAGE%%:*}
 
+
+  # Normalize ssh-* into ssh <target>
+  if [[ "$COMMAND" == ssh-* ]]; then
+    TARGET="${COMMAND#ssh-}"
+    COMMAND="ssh"
+    set -- "$TARGET" "$@"
+  fi
+
   case "$COMMAND" in
     up)
       compile_templates true
@@ -394,29 +408,29 @@ rl_docker() {
 
     ssh)
       check_up || return 1
-      local SERVICE="$1"
+      local SERVICE="${1:-web}"
       shift
       local CMD="$*"
       local CONTAINER_NAME=""
       local DOCKER_EXEC_ARGS="-it"
 
       case "$SERVICE" in
-        ""|"ssh"|"web"|"ssh-web")
+        web)
           CONTAINER_NAME=$(get_container_name "web")
           ;;
-        ssh-webroot)
+        webroot)
           CONTAINER_NAME=$(get_container_name "web")
           DOCKER_EXEC_ARGS="-u root -it"
           ;;
-        ssh-mysql)
+        mysql)
           CONTAINER_NAME=$(get_container_name "mysql")
           ;;
-        ssh-mysqlroot)
+        mysqlroot)
           CONTAINER_NAME=$(get_container_name "mysql")
           DOCKER_EXEC_ARGS="-u root -it"
           ;;
         *)
-          echo "Unknown ssh service: $SERVICE"
+          echo "Unknown ssh target: $SERVICE"
           return 1
           ;;
       esac
