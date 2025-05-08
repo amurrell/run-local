@@ -17,7 +17,7 @@ ENV REDIS_URL=redis://redis
 
 # System dependencies + curl + git (needed for NVM)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-  unzip nano curl git build-essential \
+  unzip sudo nano curl git build-essential \
   libzip-dev libicu-dev libonig-dev \
   libjpeg-dev libpng-dev libwebp-dev libfreetype6-dev \
   gnupg libyaml-dev \
@@ -28,8 +28,10 @@ RUN set -eux; \
   install-php-extensions \
   @composer \
   bcmath \
+  pcntl \
   ctype \
   curl \
+  pdo_mysql \
   dom \
   fileinfo \
   json \
@@ -50,6 +52,9 @@ RUN set -eux; \
 
 # https://getcomposer.org/doc/03-cli.md#composer-allow-superuser
 ENV COMPOSER_ALLOW_SUPERUSER=1
+
+# Add www-data to the sudoers file with no password requirement
+RUN echo "www-data ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Setup NVM + install Node + PM2
 ENV NVM_DIR=/usr/local/nvm
@@ -74,13 +79,6 @@ RUN cp /etc/skel/.bashrc /var/www/.bashrc
 # Add site directory
 RUN mkdir ${SITE_PATH}
 
-# Fix known issues with frankenphp - with php-cgi for php artisan commands
-RUN ln -sf /usr/local/bin/php-cgi /usr/local/bin/php
-
-# # Install Composer
-# RUN curl -sS https://getcomposer.org/installer | php && \
-#   mv composer.phar /usr/local/bin/composer
-
 # Create writable dirs
 RUN mkdir -p ${SITE_PATH}/storage ${SITE_PATH}/bootstrap/cache ${LOGS_FOLDER} && \
   chown -R www-data:www-data ${SITE_PATH}/storage ${SITE_PATH}/bootstrap/cache ${LOGS_FOLDER} && \
@@ -98,7 +96,12 @@ COPY ecosystem.config.js /var/www/ecosystem.config.js
 # Adjust UID for host match (optional)
 RUN usermod -u 1000 www-data
 
+# Set ownership on working dir
+RUN chown -R www-data:www-data /var/www/
+
 USER www-data
+
+RUN git config --global --add safe.directory /var/www/site
 
 # Run pm2 start if ecosystem file exists
 ENV USE_PM2=${USE_PM2}
