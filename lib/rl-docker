@@ -37,11 +37,6 @@ sync_defaults_to_args() {
   local defaults
   defaults=$(compgen -v | grep '^DEFAULT_')
 
-  # Count - if more than 0, lets step_text "Reading rl-config rl-vars and save args to rl-config/docker/args"
-  if [ ${#defaults[@]} -gt 0 ]; then
-    step_text "$(color_text primary "Reading rl-config rl-vars - saving args to") $(color_text secondary "rl-config/docker/args")"
-  fi
-
   for var in $defaults; do
     local key="${var#DEFAULT_}"  # Strip DEFAULT_ prefix
     local value="${!var}"        # Indirect variable expansion to get value
@@ -420,14 +415,26 @@ rl_docker() {
           ;;
         webroot)
           CONTAINER_NAME=$(get_container_name "web")
-          DOCKER_EXEC_ARGS="-u root -it"
+          # Use sudo to switch to www-data user
+          if [ -n "$CMD" ]; then
+            docker exec -t -i "$CONTAINER_NAME" bash -c "sudo su -c '$CMD'"
+          else
+            docker exec -t -i "$CONTAINER_NAME" bash -c 'sudo su'
+          fi
+          return
           ;;
         mysql)
           CONTAINER_NAME=$(get_container_name "mysql")
           ;;
         mysqlroot)
           CONTAINER_NAME=$(get_container_name "mysql")
-          DOCKER_EXEC_ARGS="-u root -it"
+          # Keep the default root shell behavior
+          if [ -n "$CMD" ]; then
+            docker exec -t -i "$CONTAINER_NAME" bash -c "$CMD"
+          else
+            docker exec -t -i "$CONTAINER_NAME" /bin/bash
+          fi
+          return
           ;;
         *)
           echo "Unknown ssh target: $SERVICE"

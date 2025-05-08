@@ -559,7 +559,6 @@ install() {
 }
 
 site_running_at() {
-  step_text "✅ Installation complete! The environment is ready to use."
   # if DEFAULT_SERVER_DOMAIN is localhost:
   if [[ "$DEFAULT_SERVER_DOMAIN" == "localhost" ]]; then
     printf "=== Visit the site at \e[32mhttp://localhost:%s\e[0m\n\n" "$DEFAULT_PORT"
