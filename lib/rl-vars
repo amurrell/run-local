@@ -10,8 +10,10 @@ PROJECT_NAME="🐣 YOUR PROJECT"
 
 # rl-var: Port to use for localhost - PORT
 DEFAULT_PORT="3000"
-# rl-var: Server Domain name (eg. yoursite.com) - DOMAIN
+# rl-var: Server Domain name (eg. local.yoursite.com) - SERVER_DOMAIN
 DEFAULT_SERVER_DOMAIN="localhost"
+# rl-var: Domain Production (eg. yoursite.com) - DOMAIN_PROD
+DEFAULT_DOMAIN_PROD="run-local.com"
 # rl-var: Database name in the container - DB_NAME
 DEFAULT_DB_NAME="rl_db"
 # rl-var: Web server root - where your app (in repo root) eg. html or public - WEB_SERVER_ROOT
@@ -62,6 +64,7 @@ export ASSETS_DOWNLOAD_PATH
 
 export PROJECT_NAME
 export DEFAULT_SERVER_DOMAIN
+export DEFAULT_DOMAIN_PROD
 export DEFAULT_PORT
 export DEFAULT_DB_NAME
 export DEFAULT_WEB_SERVER_ROOT

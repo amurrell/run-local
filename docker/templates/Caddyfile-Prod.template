@@ -10,7 +10,7 @@
   }
 }
 
-${PROTOCOL}://${SERVER_DOMAIN} {
+${PROTOCOL}://${DOMAIN_PROD} {
 
   root * /var/www/site/${WEB_SERVER_ROOT}
 

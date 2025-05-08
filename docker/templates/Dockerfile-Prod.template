@@ -1,0 +1,83 @@
+# --- Build stage ---
+FROM php:${PHP_VERSION}-cli-bookworm-slim AS builder
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+  unzip git curl libzip-dev libicu-dev libonig-dev libpng-dev libjpeg-dev libfreetype6-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# System dependencies + curl + git (needed for NVM)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  unzip sudo nano curl git build-essential \
+  libzip-dev libicu-dev libonig-dev \
+  libjpeg-dev libpng-dev libwebp-dev libfreetype6-dev \
+  gnupg libyaml-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+RUN set -eux; \
+  install-php-extensions \
+  @composer \
+  bcmath \
+  pcntl \
+  ctype \
+  curl \
+  pdo_mysql \
+  dom \
+  fileinfo \
+  json \
+  mbstring \
+  openssl \
+  pcre \
+  pdo_pgsql \
+  pgsql \
+  tokenizer \
+  xml \
+  intl \
+  zip \
+  redis \
+  gd \
+  yaml \
+  xdebug \
+  opcache
+
+# https://getcomposer.org/doc/03-cli.md#composer-allow-superuser
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+# Composer install
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Copy composer files and install deps
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --optimize-autoloader
+
+# Copy rest of app and optimize
+COPY . .
+RUN php artisan config:cache \
+  && php artisan route:cache \
+  && php artisan view:cache
+
+# --- Runtime stage ---
+FROM dunglas/frankenphp:1.5.0-php${PHP_VERSION}-bookworm
+
+LABEL maintainer="Angela Murrell <me@angelamurrell.com>"
+
+WORKDIR /app
+
+COPY --from=builder /app /app
+
+COPY php.custom.ini /usr/local/etc/php/conf.d/99-custom.ini
+COPY Caddyfile-Prod /etc/caddy/Caddyfile
+
+# Laravel logging to stderr
+ENV LOG_CHANNEL=stderr
+ENV FRANKENPHP_CONFIG=unix//run/frankenphp.sock
+
+RUN chown -R www-data:www-data /app/storage /app/bootstrap/cache
+
+USER www-data
+
+EXPOSE 80
+
+CMD ["frankenphp", "run", "--config", "/etc/caddy/Caddyfile"]
