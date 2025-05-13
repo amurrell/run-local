@@ -344,7 +344,7 @@ rl_docker() {
   DATA_DUMPS_DIR="$REPO_ROOT/rl/docker/data/dumps"
   DB_PASSWORD=$(load_arg "DB_PASSWORD")
   DB_USERNAME=$(load_arg "DB_USERNAME")
-  DATABASE=$(load_arg "DATABASE")
+  DATABASE=$(load_arg "DB_NAME")
   MYSQL_CONTAINER_NAME=$(get_container_name "mysql")
   WEB_CONTAINER_NAME=$(get_container_name "web")
   DB_IMAGE=$(load_arg "DB_IMAGE")
