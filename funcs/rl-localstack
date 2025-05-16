@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+
+localstack_queues_command() {
+  step_text "🏃‍♀️ Running localstack queues update..."
+
+  # Check if the localstack container is running - name will be like rl-docker$PORT-localstack-1
+  if ! docker ps --format '{{.Names}}' | grep -q "rl-docker$DEFAULT_PORT-localstack-1"; then
+    step_text "❌ Localstack container in project '$PROJECT_NAME' [rl-docker$DEFAULT_PORT-localstack-1] is not running. Please start it first."
+    return 1
+  fi
+
+  # Get the list of current queues
+  current_queues=$(./run-local ssh-localstack "awslocal sqs list-queues --region us-east-2" | \
+    awk '/http/ {gsub(/[",]/, "", $0); print $0}')
+  if [ -z "$current_queues" ]; then
+    step_text "ℹ️ No queues found to delete."
+  else
+    # Combine all delete commands into a single execution
+    delete_commands=""
+    for queue in $current_queues; do
+      queue_name=$(basename "$queue")
+      step_text "🗑️ Preparing to delete queue: $queue_name"
+      delete_commands+="awslocal sqs delete-queue --queue-url $queue; "
+    done
+
+    # Execute all delete commands in one go
+    step_text "🗑️ Deleting all queues..."
+    ./run-local ssh-localstack "$delete_commands"
+  fi
+
+  # Now run the script to create the queues again
+  step_text "🏗️ Creating queues again..."
+  step_text "Queues generated are based on computed script localstack-sqs-queues.sh"
+  SCRIPT="$REPO_ROOT/rl-config/docker/computed/localstack-sqs-queues.sh"
+  if [ -f "$SCRIPT" ]; then
+    chmod +x "$SCRIPT"
+    $SCRIPT
+  else
+    step_text "❌ Error: Script $SCRIPT not found."
+  fi
+
+  # List all the queues again
+  step_text "📜 Listing all queues again..."
+  ./run-local ssh-localstack "awslocal sqs list-queues --region us-east-2"
+  step_text "✅ Queues updated successfully."
+  return 0
+}
+
+# just list the queues
+localstack_queues_list_command() {
+  step_text "🏃‍♀️ Running localstack queues list..."
+
+  # Check if the localstack container is running - name will be like rl-docker$PORT-localstack-1
+  if ! docker ps --format '{{.Names}}' | grep -q "rl-docker$DEFAULT_PORT-localstack-1"; then
+    step_text "❌ Localstack container in project '$PROJECT_NAME' [rl-docker$DEFAULT_PORT-localstack-1] is not running. Please start it first."
+    return 1
+  fi
+
+  # List all the queues
+  step_text "📜 Listing all queues..."
+  ./run-local ssh-localstack "awslocal sqs list-queues --region us-east-2"
+  step_text "✅ Queues listed successfully."
+  return 0
+}

@@ -4,14 +4,16 @@ show_help_extended() {
   color_text faint "RL-Extended (Custom) Commands: "
   echo ""
   # the $check vs $command is for the file it comes from, eg. check "artisan" to get both artisan and debug-artisan commands
-  make_extended_option "post-install" "post-install   " "· Run post-install commands"
-  make_extended_option "composer"     "composer       " "· Run a Composer command"
-  make_extended_option "artisan"      "artisan        " "· Run an Artisan command"
-  make_extended_option "artisan"      "debug-artisan  " "· Run an Artisan command with Xdebug enabled (port $XDEBUG_CLI_PORT)"
-  make_extended_option "tinker"       "tinker         " "· Run Tinker (Laravel REPL)"
-  make_extended_option "tinker"       "debug-tinker   " "· Run Tinker with Xdebug enabled (port $XDEBUG_CLI_PORT)"
-  make_extended_option "assets"       "assets-download" ". Download assets folder via ssh into tar.gz in rl/docker/data"
-  make_extended_option "assets"       "assets         " ". Checks rl/docker/data for .tar.gz files, swaps/backs up current uploads"
+  make_extended_option "post-install" "post-install     " "· Run post-install commands"
+  make_extended_option "composer"     "composer         " "· Run a Composer command"
+  make_extended_option "artisan"      "artisan          " "· Run an Artisan command"
+  make_extended_option "artisan"      "debug-artisan    " "· Run an Artisan command with Xdebug enabled (port $XDEBUG_CLI_PORT)"
+  make_extended_option "tinker"       "tinker           " "· Run Tinker (Laravel REPL)"
+  make_extended_option "tinker"       "debug-tinker     " "· Run Tinker with Xdebug enabled (port $XDEBUG_CLI_PORT)"
+  make_extended_option "assets"       "assets-download  " ". Download assets folder via ssh into tar.gz in rl/docker/data"
+  make_extended_option "assets"       "assets           " ". Checks rl/docker/data for .tar.gz files, swaps/backs up current uploads"
+  make_extended_option "localstack"   "ls-queues        " ". Create/Update SQS queues in LocalStack using awslocal (in localstack container)"
+  make_extended_option "localstack"   "ls-queues-list   " ". List SQS queues in LocalStack using awslocal (in localstack container)"
   echo ""
 }
 
@@ -52,6 +54,16 @@ handle_rl_extended() {
       ;;
     assets)
       assets_upload
+      exit 0
+      ;;
+    ls-queues)
+      # List the localstack queues
+      localstack_queues_command
+      exit 0
+      ;;
+    ls-queues-list)
+      # List the localstack queues
+      localstack_queues_list_command
       exit 0
       ;;
     *)

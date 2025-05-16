@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+PREFIX="${QUEUES_PREFIX}"  # Prefix - include punctuation eg. _ or - (dots won't work) eg. '<prefix><queue_name><suffix>'
+SUFFIX="${QUEUES_SUFFIX}"  # Suffix - include punctuation eg. _ or - (dots won't work) eg. '<prefix><queue_name><suffix>'
+QUEUES="${QUEUES_QUEUES}"  # Comma-separated list of queue names
+FIFO_ATTRIBUTES="${QUEUES_FIFO_ATTRIBUTES}"  # FIFO attributes for the queues eg. FifoQueue=true,ContentBasedDeduplication=true
+
+# Prepare a single command to execute all queue operations
+IFS=',' read -r -a queue_array <<< "$QUEUES"  # Convert the comma-separated string into an array
+commands=""
+
+for queue in "${queue_array[@]}"; do
+  cur_queue="${PREFIX}${queue}${SUFFIX}"  # Main queue name with prefix and suffix
+
+  # Check if the main queue ends with '.fifo'
+  if [[ "$cur_queue" == *.fifo ]]; then
+    # For FIFO, set FifoQueue and ContentBasedDeduplication attributes
+    queue_attributes="--attributes FifoQueue=true,ContentBasedDeduplication=true"
+  else
+    queue_attributes=""  # No special attributes for non-FIFO
+  fi
+
+  # Add commands to check and create the queue if it doesn't exist
+  commands+="if ! awslocal sqs list-queues | grep -q \"${cur_queue}\"; then "
+  commands+="echo 'Creating main queue: ${cur_queue}'; "
+  commands+="awslocal sqs create-queue --queue-name ${cur_queue} --region us-east-2 ${queue_attributes}; "
+  commands+="else echo 'Queue already exists: ${cur_queue}'; fi; "
+done
+
+# Execute all commands in a single call
+./run-local ssh-localstack "$commands"

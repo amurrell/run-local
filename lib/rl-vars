@@ -40,6 +40,18 @@ APP_ENV_EXAMPLE_FILE=".env.example"
 DEFAULT_DEBUG_PORT=9002
 # rl-var: X Debug CLI port - this is the port used for xdebug when running from CLI - DEBUG_CLI_PORT
 DEFAULT_DEBUG_CLI_PORT=9003
+# rl-var: If using localstack container in docker-compose, comma-separated list of AWS services to start - LOCAL_STACK_AWS_SERVICES
+DEFAULT_LOCAL_STACK_AWS_SERVICES="sqs,lambda"
+# rl-var: If using localstack container in docker-compose, set to 1 to enable debug mode - LOCAL_STACK_DEBUG
+DEFAULT_LOCAL_STACK_DEBUG=1
+# rl-var: Localstack SQS queues (name pattern is <prefix><queue-name>) - QUEUES_PREFIX
+DEFAULT_QUEUES_PREFIX="project_"
+# rl-var: Localstack SQS queues (comma-separated list of queue names) end with .fifo for fifo queues - QUEUES_QUEUES
+DEFAULT_QUEUES_QUEUES="queue1,queue2,queue3"
+# rl-var: Localstack SQS queues - suffix for queue names (eg. -production, -development, -local) - QUEUES_SUFFIX
+DEFAULT_QUEUES_SUFFIX="-local"
+# rl-var: Localstack SQS queues - attributes for FIFO queues (eg. FifoQueue=true,ContentBasedDeduplication=true) - QUEUES_FIFO_ATTRIBUTES
+DEFAULT_QUEUES_FIFO_ATTRIBUTES="FifoQueue=true,ContentBasedDeduplication=true"
 # rl-var: Does your project use pm2 (eg. for laravel horizon, queues, scheduler) - true|false - PM2
 USE_PM2=false
 
@@ -51,6 +63,9 @@ ASSETS_SSH_SERVER_SOURCE_DIR='/var/www/yourproject.com/wp-content/uploads'
 ASSETS_FILE='rl-assets-download'  # we will append a timestamp, tar.gz
 ASSETS_LOCAL_PATH="$REPO_ROOT/html/wp-content/uploads"
 ASSETS_DOWNLOAD_PATH="$DATA_DUMPS_DIR/$ASSETS_FILE"
+
+# Disable extended funcs - ignore rl/funcs/<rl-func> file - comma-separated list
+DISABLE_RL_EXTENDED=rl-assets
 
 # Export rl-extended variables
 
@@ -75,6 +90,12 @@ export DEFAULT_APP_PATH
 export DEFAULT_LOGS_FOLDER
 export DEFAULT_DEBUG_CLI_PORT
 export DEFAULT_DEBUG_PORT
+export DEFAULT_LOCAL_STACK_AWS_SERVICES
+export DEFAULT_LOCAL_STACK_DEBUG
+export DEFAULT_QUEUES_PREFIX
+export DEFAULT_QUEUES_SUFFIX
+export DEFAULT_QUEUES_QUEUES
+export DEFAULT_QUEUES_FIFO_ATTRIBUTES
 
 export USE_PM2
 
@@ -83,3 +104,5 @@ export DEFAULT_DB_PASSWORD
 
 export APP_ENV_FILE
 export APP_ENV_EXAMPLE_FILE
+
+export DISABLE_RL_EXTENDED

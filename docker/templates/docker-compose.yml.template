@@ -18,6 +18,7 @@ services:
       - mysql
       - memcached
       - redis
+      - localstack
     environment:
       - REDIS_URL=redis://redis
     ports:
@@ -57,6 +58,19 @@ services:
     restart: always
     ports:
       - "${REDIS_PORT}:6379"
+    networks:
+      - rl-net
+
+  localstack:
+    image: localstack/localstack:latest
+    environment:
+      - SERVICES=${LOCAL_STACK_AWS_SERVICES} # Pass services to LocalStack
+      - DEBUG=${LOCAL_STACK_DEBUG} # Enable debug logging if needed
+    ports:
+      - "${LS_EDGE_PORT}:4566" # Expose LocalStack edge port
+      - "${LS_INT_RANGE}:4510-4559" # Expose internal services
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock" # Docker socket for LocalStack to manage Docker
     networks:
       - rl-net
 

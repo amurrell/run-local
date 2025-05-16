@@ -75,55 +75,91 @@ compute_ports() {
   MEMCACHED_PORT=$((11211 + BASE_PORT))
   # shellcheck disable=SC2034
   REDIS_PORT=$((6379 + BASE_PORT))
+  # shellcheck disable=SC2034
+  LS_EDGE_PORT=$((4566 + BASE_PORT))
+  # shellcheck disable=SC2034
+  LS_INT_PORT_LOW=$((4510 + BASE_PORT))
+  # shellcheck disable=SC2034
+  LS_INT_PORT_HIGH=$((4559 + BASE_PORT))
+
+  # combine the low and high port into a range
+  LS_INT_RANGE="$LS_INT_PORT_LOW-$LS_INT_PORT_HIGH"
 }
 
 compile_templates() {
   step_text "Compiling templates..."
 
-  local templates_dir="$REPO_ROOT/rl-config/docker/templates"
-  if [ ! -d "$templates_dir" ]; then
-    templates_dir="$REPO_ROOT/rl/docker/templates"
-  fi
+  local templates_dir_rl="$REPO_ROOT/rl/docker/templates"
+  local templates_dir_rl_config="$REPO_ROOT/rl-config/docker/templates"
+  local computed_dir="$REPO_ROOT/rl-config/docker/computed"
 
-  mkdir -p "$REPO_ROOT/rl-config/docker/computed"
+  mkdir -p "$computed_dir"
 
   compute_ports
 
-  for template in "$templates_dir"/*.template; do
+  # Create an empty list to store the template files to be processed
+  local template_files=()
+
+  # Loop through templates in rl/docker/templates
+  for template in "$templates_dir_rl"/*.template; do
     [ -e "$template" ] || continue
 
     local template_name
     template_name=$(basename "$template" .template)
-    local output_file="$REPO_ROOT/rl-config/docker/computed/$template_name"
+    local override_template="$templates_dir_rl_config/$template_name.template"
+
+    # If the template is overridden in rl-config, use that one
+    if [ -e "$override_template" ]; then
+      template_files+=("$override_template")
+    else
+      template_files+=("$template")
+    fi
+  done
+
+  # Loop through templates in rl-config/docker/templates
+  for template in "$templates_dir_rl_config"/*.template; do
+    [ -e "$template" ] || continue
+
+    local template_name
+    template_name=$(basename "$template" .template)
+
+    # If this template wasn't added already (i.e., it doesn't exist in rl/docker/templates), add it
+    if [[ ! " ${template_files[@]} " =~ " $template " ]]; then
+      template_files+=("$template")
+    fi
+  done
+
+  # Now compile all the templates in the template_files array
+  for template in "${template_files[@]}"; do
+    local template_name
+    template_name=$(basename "$template" .template)
+    local output_file="$computed_dir/$template_name"
 
     local template_content
     template_content=$(<"$template")
+
+    # Replace computed port variables - do first
+    for var in BASE_PORT WEB_PORT SSL_PORT SOCKET_PORT MYSQL_PORT MEMCACHED_PORT REDIS_PORT LS_EDGE_PORT LS_INT_RANGE; do
+      value="${!var}"  # Get the value of the environment variable (safe, no eval needed)
+      safe_value=$(echo "$value" | sed 's/[\/&]/\\&/g')
+      template_content=$(echo "$template_content" | sed "s|\${$var}|$safe_value|g")
+    done
 
     # Replace regular args
     for arg_file in "$REPO_ROOT/rl-config/docker/args/"* "$REPO_ROOT/rl/docker/args/"* ; do
       var_name=$(basename "$arg_file")
       var_value=$(<"$arg_file")
       safe_value=$(echo "$var_value" | sed 's/[\/&]/\\&/g')
-      # debug: keep this here
-      # echo "$(color_text primary "Replacing") $(color_text secondary "\${$var_name}") $(color_text faint "$safe_value")"
       template_content=$(echo "$template_content" | sed "s|\${$var_name}|$safe_value|g")
-    done
-
-    # Replace computed port variables
-    for var in BASE_PORT WEB_PORT SSL_PORT SOCKET_PORT MYSQL_PORT MEMCACHED_PORT REDIS_PORT; do
-      value=$(eval echo \$$var)
-      safe_value=$(echo "$value" | sed 's/[\/&]/\\&/g')
-      template_content=$(echo "$template_content" | sed "s|\${$var}|$safe_value|g")
     done
 
     # Output the compiled template to the computed directory
     echo "$template_content" > "$output_file"
-    # use color_text to color the output_file
     echo "$(color_text primary "Compiled template") $(color_text secondary "$template")"
     echo " → $(color_text faint "$output_file")"
   done
 
-  # if the rl-config/docker/conf folder doesnt exist, copy it to from rl/docker/conf
+  # If the rl-config/docker/conf folder doesn't exist, copy it from rl/docker/conf
   if [ ! -d "$REPO_ROOT/rl-config/docker/conf" ]; then
     step_text "Copying conf files to rl-config/docker/conf - they were missing."
     mkdir -p "$REPO_ROOT/rl-config/docker/conf"
@@ -131,6 +167,7 @@ compile_templates() {
     echo "$(color_text primary "Copied") $(color_text secondary "conf") $(color_text faint "to rl-config/docker/conf")"
   fi
 }
+
 
 docker_compose_cmd() {
   if command -v docker-compose &> /dev/null; then
@@ -437,8 +474,20 @@ rl_docker() {
           return
           ;;
         *)
-          echo "Unknown ssh target: $SERVICE"
-          return 1
+          step_text "Attempting 'ssh' on custom service: $SERVICE"
+          # if ends * ends in root, use root
+          if [[ "$SERVICE" == *root ]]; then
+            CONTAINER_NAME=$(get_container_name "${SERVICE%root}")
+            # if cmd
+            if [ -n "$CMD" ]; then
+            docker exec -t -i "$CONTAINER_NAME" bash -c "sudo su -c '$CMD'"
+            else
+              docker exec -t -i "$CONTAINER_NAME" bash -c 'sudo su'
+            fi
+            return
+          else
+            CONTAINER_NAME=$(get_container_name "$SERVICE")
+          fi
           ;;
       esac
 

@@ -1,17 +1,68 @@
 #!/usr/bin/env bash
 
 ## Use to extend the usage of the rl commmand
+RL_CONFIG="$REPO_ROOT/rl-config"
 
-# Load any rl-* functions in the rl-funcs folder
-if [ -d "$RL_FUNC_FOLDER" ]; then
-  for file in "$RL_FUNC_FOLDER/rl-"*; do
+# # Load any rl-* functions in the rl-funcs folder
+# if [ -d "$RL_FUNC_FOLDER" ]; then
+#   for file in "$RL_FUNC_FOLDER/rl-"*; do
+#     if [ -f "$file" ]; then
+#       # shellcheck source=/dev/null
+#       source "$file"
+#       # step_text "Loaded rl-extended function: $file"
+#     fi
+#   done
+# fi
+
+# Helper function to check if a function is disabled
+is_func_disabled() {
+  local func_name="$1"
+  [[ ",$DISABLE_RL_EXTENDED," == *",${func_name},"* ]]  # Check if function is in the DISABLE_RL_EXTENDED list
+}
+
+# only output if no args are passed
+RL_EXT_OUTPUT="false"
+if [ -z $1 ]; then
+  RL_EXT_OUTPUT="true"
+fi
+
+# Function to load functions from a specific folder
+load_functions_from_folder() {
+  local funcs_folder="$1"
+  for file in "$funcs_folder"/rl-*; do
     if [ -f "$file" ]; then
+      func_name=$(basename "$file")
+
+      # Skip disabled functions
+      if is_func_disabled "$func_name"; then
+        if [[ "$RL_EXT_OUTPUT" == "true" ]]; then
+          echo "Skipping disabled function in $funcs_folder: $func_name"
+        fi
+        continue
+      fi
+
+      # Skip if the function already exists in RL_CONFIG/funcs
+      if [[ "$funcs_folder" == "$RL_DIR/funcs" && -f "$RL_CONFIG/funcs/$func_name" ]]; then
+        if [[ "$RL_EXT_OUTPUT" == "true" ]]; then
+          echo "Function exists in rl-config/funcs (which overrides), skipping: $func_name"
+        fi
+        continue
+      fi
+
+      # Load the function
       # shellcheck source=/dev/null
       source "$file"
-      # step_text "Loaded rl-extended function: $file"
+      if [[ "$RL_EXT_OUTPUT" == "true" ]]; then
+        # Use color_text to color the loaded function name
+        step_text "$(color_text faint "Extended - Loaded function: $file")"
+      fi
     fi
   done
-fi
+}
+
+# Load functions from both directories (RL_DIR/funcs first, then RL_CONFIG/funcs)
+load_functions_from_folder "$RL_DIR/funcs"
+load_functions_from_folder "$RL_CONFIG/funcs"
 
 # keep track of the extended commands for length
 EXTENDED_COMMANDS=()
@@ -19,7 +70,14 @@ EXTENDED_COMMANDS=()
 # see if rl-<$1> exists in rl-funcs/ folder, primary or disabled
 get_extended_option_color() {
   local color='disabled'
-  [ -f "$RL_FUNC_FOLDER/rl-$1" ] && color='primary'
+  # if in RL_CONFIG/funcs OR in RL_DIR/funcs - then color is primary
+  if [[ -f "$RL_CONFIG/funcs/rl-$1" || -f "$RL_DIR/funcs/rl-$1" ]]; then
+    color='primary'
+  fi
+  # see if the $1 is in the disabled list
+  if [[ ",$DISABLE_RL_EXTENDED," == *",rl-${1},"* ]]; then
+    color='disabled'
+  fi
   echo "$color"
 }
 
@@ -39,7 +97,13 @@ make_extended_option(){
   # if color==disabled, append -disabled to the command
   if [ "$color" == "disabled" ]; then
     trimmed_command="$trimmed_command [disabled]"
-    description="· Add $display_func_folder_name/rl-$check to enable"
+
+    # if the reason is that its disabled in DISABLE_RL_EXTENDED, change the description
+    if [[ ",$DISABLE_RL_EXTENDED," == *",rl-${check},"* ]]; then
+      description="· Disabled in rl-vars DISABLE_RL_EXTENDED"
+    else
+      description="· Add $RL_CONFIG/funcs/rl-$check to enable"
+    fi
   fi
   EXTENDED_COMMANDS+=("$trimmed_command")
   # Adjust the displayed index to be one-based (index + 1)
@@ -49,7 +113,14 @@ make_extended_option(){
   if [ "$color" == "disabled" ]; then
     pretty_option "$(color_text disabled "e$index) $command $description" disabled)"
   else
-    pretty_option "$(color_text "$color" "e$index)")" "$command" "$description"
+    # spacing for single digit numbers
+    if [ "$index" -gt 9 ]; then
+      pretty_option "$(color_text "$color" "e$index)")" "$command" "$description"
+    else
+      # if index < 10, add a space before the number
+      # use color_text to color the number
+      pretty_option "$(color_text "$color" "e$index)") " "$command" "$description"
+    fi
   fi
 }
 

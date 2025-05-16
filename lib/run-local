@@ -731,7 +731,7 @@ case $1 in
     rl_docker "$1" "${@:2}"
     exit $?
     ;;
-  ssh|ssh-web|ssh-webroot|ssh-mysql|ssh-mysqlroot)
+  ssh|ssh-*)
     rl_docker "$1" "${@:2}"
     exit $?
     ;;
