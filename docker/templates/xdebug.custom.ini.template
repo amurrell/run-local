@@ -3,3 +3,4 @@ xdebug.mode=develop,debug
 xdebug.client_host=host.docker.internal
 xdebug.start_with_request=yes
 xdebug.log=/var/www/site/rl/logs/xdebug.log
+xdebug.client_port=${DEBUG_PORT}
