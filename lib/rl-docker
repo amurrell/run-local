@@ -92,42 +92,26 @@ compile_templates() {
   local templates_dir_rl="$REPO_ROOT/rl/docker/templates"
   local templates_dir_rl_config="$REPO_ROOT/rl-config/docker/templates"
   local computed_dir="$REPO_ROOT/rl-config/docker/computed"
+  local template_files=()
+  local temp_dir="${TMPDIR:-/tmp}/runlocal-templates-${RANDOM}"
+
+  if [[ ${#@} -gt 0 ]]; then
+    # if any arguments are specified, interpret them as a template file
+    template_files=( $@ )
+  else
+    # If no args specified, auto-calculate templates.
+    # make a temp dir and then copy all the templates into the dir.
+    # rl_config templates take precedence, so copy them last to overwrite
+    # any templates with a lower precedence.
+    mkdir "${temp_dir}"
+    cp ${templates_dir_rl}/*.template ${temp_dir}/
+    cp ${templates_dir_rl_config}/*.template ${temp_dir}/
+    template_files=( ${temp_dir}/*.template )
+  fi
 
   mkdir -p "$computed_dir"
 
   compute_ports
-
-  # Create an empty list to store the template files to be processed
-  local template_files=()
-
-  # Loop through templates in rl/docker/templates
-  for template in "$templates_dir_rl"/*.template; do
-    [ -e "$template" ] || continue
-
-    local template_name
-    template_name=$(basename "$template" .template)
-    local override_template="$templates_dir_rl_config/$template_name.template"
-
-    # If the template is overridden in rl-config, use that one
-    if [ -e "$override_template" ]; then
-      template_files+=("$override_template")
-    else
-      template_files+=("$template")
-    fi
-  done
-
-  # Loop through templates in rl-config/docker/templates
-  for template in "$templates_dir_rl_config"/*.template; do
-    [ -e "$template" ] || continue
-
-    local template_name
-    template_name=$(basename "$template" .template)
-
-    # If this template wasn't added already (i.e., it doesn't exist in rl/docker/templates), add it
-    if [[ ! " ${template_files[@]} " =~ " $template " ]]; then
-      template_files+=("$template")
-    fi
-  done
 
   # Now compile all the templates in the template_files array
   for template in "${template_files[@]}"; do
@@ -158,6 +142,9 @@ compile_templates() {
     echo "$(color_text primary "Compiled template") $(color_text secondary "$template")"
     echo " → $(color_text faint "$output_file")"
   done
+
+  # clean up the temporary templates location
+  rm -rf "${temp_dir}"
 
   # If the rl-config/docker/conf folder doesn't exist, copy it from rl/docker/conf
   if [ ! -d "$REPO_ROOT/rl-config/docker/conf" ]; then
