@@ -1,79 +1,45 @@
-# --- Build stage ---
-FROM php:${PHP_VERSION}-cli-bookworm-slim AS builder
+# --- Default Runtime stage build arguments ---
+# when updating the version of the builder, use:
+# docker build . -f Dockerfile.Builder --build-arg BUILDER_VERSION=<semVer> #...the rest of the args...
+ARG BUILDER_VERSION=0.0.0
+ARG BUILDER_PHP_VERSION=${PHP_VERSION}
+ARG BUILDER_IMAGE_VARIANT=${FRANKENPHP_IMAGE_VARIANT}
+ARG BUILDER_FRANKENPHP_VERSION=${FRANKENPHP_VERSION}
+ARG DOCKER_REGISTRY=${DOCKER_REGISTRY_URL}
 
-WORKDIR /app
+# --- Build Stage ---
+FROM ${DOCKER_REGISTRY_URL}/${DOCKER_IMAGE_NAME}:builder-${BUILDER_VERSION} as builder
 
-RUN apt-get update && apt-get install -y \
-  unzip git curl libzip-dev libicu-dev libonig-dev libpng-dev libjpeg-dev libfreetype6-dev \
-  && rm -rf /var/lib/apt/lists/*
-
-# System dependencies + curl + git (needed for NVM)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-  unzip sudo nano curl git build-essential \
-  libzip-dev libicu-dev libonig-dev \
-  libjpeg-dev libpng-dev libwebp-dev libfreetype6-dev \
-  gnupg libyaml-dev \
-  && rm -rf /var/lib/apt/lists/*
-
-# Install PHP extensions
-RUN set -eux; \
-  install-php-extensions \
-  @composer \
-  bcmath \
-  pcntl \
-  ctype \
-  curl \
-  pdo_mysql \
-  dom \
-  fileinfo \
-  json \
-  mbstring \
-  openssl \
-  pcre \
-  pdo_pgsql \
-  pgsql \
-  tokenizer \
-  xml \
-  intl \
-  zip \
-  redis \
-  gd \
-  yaml \
-  xdebug \
-  opcache
-
-# https://getcomposer.org/doc/03-cli.md#composer-allow-superuser
-ENV COMPOSER_ALLOW_SUPERUSER=1
-
-# Composer install
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-# Copy composer files and install deps
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader
-
-# Copy rest of app and optimize
+# Copy full application (to ensure artisan exists before composer install)
 COPY . .
-RUN php artisan config:cache \
+
+# Install dependencies and cache Laravel configs
+RUN composer install --no-dev --optimize-autoloader \
+  && php artisan config:cache \
   && php artisan route:cache \
   && php artisan view:cache
 
 # --- Runtime stage ---
-FROM dunglas/frankenphp:1.5.0-php${PHP_VERSION}-bookworm
-
-LABEL maintainer="Angela Murrell <me@angelamurrell.com>"
+FROM dunglas/frankenphp:${BUILDER_FRANKENPHP_VERSION}-php${BUILDER_PHP_VERSION}-${BUILDER_IMAGE_VARIANT}
 
 WORKDIR /app
 
 COPY --from=builder /app /app
 
+# Copy custom PHP config
 COPY php.custom.ini /usr/local/etc/php/conf.d/99-custom.ini
-COPY Caddyfile-Prod /etc/caddy/Caddyfile
 
-# Laravel logging to stderr
+# Copy templated Caddyfile and entrypoint
+COPY Caddyfile /etc/caddy/Caddyfile
+
+RUN mkdir -p /config/caddy /data/caddy \
+  && chown -R www-data:www-data /config /data
+
+# Laravel logging + FrankenPHP socket
 ENV LOG_CHANNEL=stderr
 ENV FRANKENPHP_CONFIG=unix//run/frankenphp.sock
 
+# Set correct permissions
 RUN chown -R www-data:www-data /app/storage /app/bootstrap/cache
 
 USER www-data

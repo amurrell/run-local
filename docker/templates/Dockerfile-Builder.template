@@ -1,0 +1,49 @@
+# --- Default Build stage build arguments ---
+ARG BUILDER_PHP_VERSION=${PHP_VERSION}
+ARG BUILDER_IMAGE_VARIANT=${FRANKENPHP_IMAGE_VARIANT}
+
+# --- Builder Stage ---
+FROM dunglas/frankenphp:builder-php${BUILDER_PHP_VERSION}-${BUILDER_IMAGE_VARIANT}
+
+WORKDIR /app
+
+# Install all required dependencies (merged into one step)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  unzip sudo nano curl git build-essential gettext \
+  libzip-dev libicu-dev libonig-dev \
+  libjpeg-dev libpng-dev libwebp-dev libfreetype6-dev \
+  gnupg libyaml-dev \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install PHP extensions
+RUN set -eux; \
+  install-php-extensions \
+  @composer \
+  bcmath \
+  pcntl \
+  ctype \
+  curl \
+  pdo_mysql \
+  dom \
+  fileinfo \
+  json \
+  mbstring \
+  openssl \
+  pcre \
+  pdo_pgsql \
+  pgsql \
+  tokenizer \
+  xml \
+  intl \
+  zip \
+  redis \
+  gd \
+  yaml \
+  xdebug \
+  opcache
+
+# Allow Composer to run as root
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+# Copy composer binary
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer

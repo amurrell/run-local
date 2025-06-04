@@ -54,6 +54,9 @@ DEFAULT_QUEUES_SUFFIX="-local"
 DEFAULT_QUEUES_FIFO_ATTRIBUTES="FifoQueue=true,ContentBasedDeduplication=true"
 # rl-var: Does your project use pm2 (eg. for laravel horizon, queues, scheduler) - true|false - PM2
 USE_PM2=false
+# rl-var: Docker image name - the <name> for command docker build -t <name>:<tag> DOCKER_IMAGE_NAME
+DOCKER_IMAGE_NAME="rl-image"
+
 
 # rl-extended-options variables
 
@@ -98,6 +101,7 @@ export DEFAULT_QUEUES_QUEUES
 export DEFAULT_QUEUES_FIFO_ATTRIBUTES
 
 export USE_PM2
+export DOCKER_IMAGE_NAME
 
 export DEFAULT_NPM_COMMAND
 export DEFAULT_DB_PASSWORD

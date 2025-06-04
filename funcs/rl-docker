@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+
+docker_down_command() {
+  # Stop and remove the container
+  if docker ps -a --format '{{.Names}}' | grep -q "^$DOCKER_IMAGE_NAME$"; then
+    step_text "🧹 Stopping and removing container: $DOCKER_IMAGE_NAME"
+    docker rm -f "$DOCKER_IMAGE_NAME"
+  fi
+}
+
+docker_generate_command() {
+
+  # shellcheck disable=SC2206
+  local docker_templates=( ${REPO_ROOT}/rl*/docker/templates/Dockerfile-*.template )
+
+  # Compile templates (from rl/lib/rl-docker)
+  step_text "Compiling rl-docker templates into computed Dockerfiles ..."
+  compile_templates "${docker_templates[@]}"
+  step_text "Copying Dockerfile-Prod, Dockerfile-Builder into repo root..."
+  cp "${REPO_ROOT}/rl-config/docker/computed/Dockerfile-Prod" "${REPO_ROOT}/Dockerfile"
+  cp "${REPO_ROOT}/rl-config/docker/computed/Dockerfile-Builder" "${REPO_ROOT}/Builder.Dockerfile"
+
+  step_text "✅ Dockerfiles successfully Generated: Dockerfile, Builder.Dockerfile"
+}
+
+docker_build_command() {
+  NAME="$DOCKER_IMAGE_NAME"
+  REPO_ROOT="${REPO_ROOT:-$(pwd)}"
+  TAG=${TAG:-"test-$(date +%Y-%m-%d-%H-%M)"}
+
+  read -rp "Enter the tag name (default: $TAG): " input_tag
+  TAG=${input_tag:-$TAG}
+
+  TEMPLATES_DIR="$REPO_ROOT/rl-config/docker/templates"
+  COMPUTED_DIR="$REPO_ROOT/rl-config/docker/computed"
+
+  # 🧾 Explicit list of templates
+  templates=(
+    "Dockerfile-Prod.template"
+    "Dockerfile-Builder.template"
+    "Caddyfile-Prod.template"
+    "dockerignore.template"
+    "php.custom.ini.template"
+  )
+
+  for template_file in "${templates[@]}"; do
+    template_path="$TEMPLATES_DIR/$template_file"
+    computed_path="$COMPUTED_DIR/${template_file%.template}"
+
+    # Final name logic
+    case "$template_file" in
+      Dockerfile-Prod.template) final_name="Dockerfile" ;;
+      Dockerfile-Builder.template) final_name="Builder.Dockerfile" ;;
+      Caddyfile-Prod.template) final_name="Caddyfile" ;;
+      dockerignore.template) final_name=".dockerignore" ;;
+      *) final_name="${template_file%.template}"; final_name="${final_name/-Prod/}" ;;
+    esac
+
+    final_path="$REPO_ROOT/$final_name"
+
+    # Compile if not generated
+    if [ ! -f "$computed_path" ]; then
+      step_text "⏳ Compiling: $template_file"
+      compile_templates "$template_path"
+    fi
+
+    # Copy if missing or changed
+    if [ ! -f "$final_path" ] || ! cmp -s "$computed_path" "$final_path"; then
+      cp "$computed_path" "$final_path"
+      step_text "📄 Copied to: $final_name"
+    fi
+  done
+
+  DOCKERFILE="$REPO_ROOT/Dockerfile"
+  BUILDERFILE="$REPO_ROOT/Builder.Dockerfile"
+
+  BUILDER_VERSION=$(grep 'ARG BUILDER_VERSION=' "$DOCKERFILE" | cut -d= -f2)
+  DOCKER_REGISTRY=$(grep 'ARG DOCKER_REGISTRY=' "$DOCKERFILE" | cut -d= -f2)
+  BUILDER_TAG="$DOCKER_REGISTRY/$NAME:builder-$BUILDER_VERSION"
+
+  # Build local builder if missing
+  if ! docker image inspect "$BUILDER_TAG" >/dev/null 2>&1; then
+    step_text "🔧 Builder image not found. Building locally..."
+    docker build -f "$BUILDERFILE" \
+      -t "$NAME:builder-$BUILDER_VERSION" "$REPO_ROOT"
+    docker tag "$NAME:builder-$BUILDER_VERSION" "$BUILDER_TAG"
+  else
+    step_text "✅ Builder image found: $BUILDER_TAG"
+  fi
+
+  docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile" caddy caddy fmt --overwrite /etc/caddy/Caddyfile
+
+  step_text "🏗️  Building final image: $NAME:$TAG"
+  docker build . -t "$NAME:$TAG"
+  if [ $? -ne 0 ]; then
+    step_text "❌ Docker build failed"
+    return
+  fi
+
+  step_text "✅ Docker image built: $NAME:$TAG"
+
+  read -rp "Remove old test tags? (y/n): " REMOVE_OLD
+  if [ "$REMOVE_OLD" = "y" ] || [ "$REMOVE_OLD" = "Y" ]; then
+    docker_down_command
+    docker images --format '{{.Repository}}:{{.Tag}}' | grep "^$NAME:test-" | grep -v "$TAG" | xargs -r docker rmi
+  fi
+
+  read -rp "Run container? (y/n): " RUN_CONTAINER
+  if [ "$RUN_CONTAINER" = "y" ] || [ "$RUN_CONTAINER" = "Y" ]; then
+    docker_run_command
+  else
+    step_text "⏹️ Image built, not running."
+  fi
+}
+
+docker_run_command() {
+  step_text "📂 Place your custom .env.<environment> files in the project root to test different environments."
+  step_text "🔍 Scanning for .env files..."
+
+  # Find .env files (excluding .env.example)
+  env_files=()
+  for file in "$REPO_ROOT"/.env*; do
+    [[ "$file" == *".env.example" ]] && continue
+    [[ -f "$file" ]] && env_files+=("$file")
+  done
+
+  # No .env files found
+  if [ ${#env_files[@]} -eq 0 ]; then
+    step_text "❌ No .env files found in $REPO_ROOT"
+    return
+  fi
+
+  # If only one .env file, auto-select it
+  if [ ${#env_files[@]} -eq 1 ]; then
+    ENV="${env_files[0]}"
+    step_text "📄 Found 1 .env file: $ENV. Using it."
+  else
+    echo "Available .env files:"
+    i=1
+    for file in "${env_files[@]}"; do
+      echo "  [$i] $(basename "$file")"
+      i=$((i + 1))
+    done
+
+    read -rp "Enter the number of the .env file to use: " env_selection
+    if ! [[ "$env_selection" =~ ^[0-9]+$ ]] || [ "$env_selection" -lt 1 ] || [ "$env_selection" -gt "${#env_files[@]}" ]; then
+      step_text "❌ Invalid .env selection."
+      return
+    fi
+    ENV="${env_files[$((env_selection - 1))]}"
+    step_text "📄 Using .env file: $ENV"
+  fi
+
+  # Get available tags for the image
+  tags=()
+  while IFS= read -r line; do
+    tag=$(echo "$line" | cut -d: -f2)
+    tags+=("$tag")
+  done < <(docker images --format '{{.Repository}}:{{.Tag}}' | grep "^$DOCKER_IMAGE_NAME:")
+
+  # No tags found
+  if [ ${#tags[@]} -eq 0 ]; then
+    step_text "❌ No tags found for image: $DOCKER_IMAGE_NAME"
+    return
+  fi
+
+  # Auto-select if only one tag
+  if [ ${#tags[@]} -eq 1 ]; then
+    SELECTED_TAG="${tags[0]}"
+    step_text "📦 Found only one tag: $SELECTED_TAG. Using it."
+  else
+    echo "Available tags for image: $DOCKER_IMAGE_NAME"
+    i=1
+    for tag in "${tags[@]}"; do
+      echo "  [$i] $tag"
+      i=$((i + 1))
+    done
+
+    read -rp "Enter the number of the tag to run: " selection
+    if ! [[ "$selection" =~ ^[0-9]+$ ]] || [ "$selection" -lt 1 ] || [ "$selection" -gt "${#tags[@]}" ]; then
+      step_text "❌ Invalid tag selection."
+      return
+    fi
+    SELECTED_TAG="${tags[$((selection - 1))]}"
+  fi
+
+  SELECTED_IMAGE="$DOCKER_IMAGE_NAME:$SELECTED_TAG"
+
+  # Remove existing container
+  docker_down_command
+
+  # Set APP_ENV
+  if [[ "$SELECTED_TAG" == *"prod"* ]]; then
+    APP_ENV="production"
+  elif [[ "$SELECTED_TAG" == *"dev"* ]]; then
+    APP_ENV="development"
+  else
+    APP_ENV="local"
+  fi
+
+  step_text "🛫 Running container: $SELECTED_IMAGE"
+  docker run --name "$DOCKER_IMAGE_NAME" --env-file "$ENV" -e APP_URL=http://localhost -e APP_ENV=$APP_ENV -p 80:80 "$SELECTED_IMAGE"
+}
+
+docker_exec_command() {
+  args=("$@")
+  # Check if the container is running
+  if ! docker ps --format '{{.Names}}' | grep -q "^$DOCKER_IMAGE_NAME$"; then
+    step_text "❌ Container $DOCKER_IMAGE_NAME is not running. Please start it first."
+    return
+  fi
+
+  step_text "🔍 Executing command in container: $DOCKER_IMAGE_NAME"
+  # Run the command in the container
+  # If no args, just run bash
+  if [ ${#args[@]} -eq 0 ]; then
+    CMD="bash"
+  else
+    CMD="${args[*]}"
+  fi
+
+  step_text "📦 Running command: docker exec -it $DOCKER_IMAGE_NAME ${args[*]}"
+  # shellcheck disable=SC2086
+  docker exec -it "$DOCKER_IMAGE_NAME" $CMD
+}
