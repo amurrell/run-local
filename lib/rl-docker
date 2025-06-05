@@ -83,9 +83,12 @@ compute_ports() {
   LS_INT_PORT_HIGH=$((4559 + BASE_PORT))
 
   # combine the low and high port into a range
+  # shellcheck disable=SC2034
   LS_INT_RANGE="$LS_INT_PORT_LOW-$LS_INT_PORT_HIGH"
 }
 
+# We pass args in other files that get sourced
+# shellcheck disable=SC2120
 compile_templates() {
   step_text "Compiling templates..."
 
@@ -96,17 +99,19 @@ compile_templates() {
   local temp_dir="${TMPDIR:-/tmp}/runlocal-templates-${RANDOM}"
 
   if [[ ${#@} -gt 0 ]]; then
+    echo "Compiling specified templates: $*"
     # if any arguments are specified, interpret them as a template file
-    template_files=( $@ )
+    template_files=( "$@" )
   else
+    echo "No specific templates provided. Compiling all templates in the default directories."
     # If no args specified, auto-calculate templates.
     # make a temp dir and then copy all the templates into the dir.
     # rl_config templates take precedence, so copy them last to overwrite
     # any templates with a lower precedence.
     mkdir "${temp_dir}"
-    cp ${templates_dir_rl}/*.template ${temp_dir}/
-    cp ${templates_dir_rl_config}/*.template ${temp_dir}/
-    template_files=( ${temp_dir}/*.template )
+    cp "${templates_dir_rl}"/*.template "${temp_dir}/"
+    cp "${templates_dir_rl_config}"/*.template "${temp_dir}/"
+    template_files=( "${temp_dir}"/*.template )
   fi
 
   mkdir -p "$computed_dir"
@@ -139,7 +144,7 @@ compile_templates() {
 
     # Output the compiled template to the computed directory
     echo "$template_content" > "$output_file"
-    echo "$(color_text primary "Compiled template") $(color_text secondary "$template")"
+    echo "$(color_text primary "Compiled template") $(color_text secondary "$template_name")"
     echo " → $(color_text faint "$output_file")"
   done
 
@@ -387,7 +392,7 @@ rl_docker() {
 
   case "$COMMAND" in
     up)
-      compile_templates true
+      compile_templates
       copy_conf_files_to_computed
       echo "Starting containers..."
       $(docker_compose_cmd) -p "$DOCKER_PROJECT" -f "$COMPOSE_FILE" up --build -d
@@ -408,14 +413,14 @@ rl_docker() {
       ;;
 
     up-foreground)
-      compile_templates true
+      compile_templates
       copy_conf_files_to_computed
       echo "Starting containers in foreground..."
       $(docker_compose_cmd) -p "$DOCKER_PROJECT" -f "$COMPOSE_FILE" up --build
       ;;
 
     build)
-      compile_templates false
+      compile_templates
       copy_conf_files_to_computed
       echo "Building containers..."
       $(docker_compose_cmd) -p "$DOCKER_PROJECT" -f "$COMPOSE_FILE" build
