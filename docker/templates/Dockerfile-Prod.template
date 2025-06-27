@@ -8,7 +8,7 @@ ARG BUILDER_FRANKENPHP_VERSION=${FRANKENPHP_VERSION}
 ARG DOCKER_REGISTRY=${DOCKER_REGISTRY_URL}
 
 # --- Build Stage ---
-FROM ${DOCKER_REGISTRY_URL}/${DOCKER_IMAGE_NAME}:builder-${BUILDER_VERSION} as builder
+FROM ${DOCKER_REGISTRY}/${DOCKER_IMAGE_NAME}:builder-${BUILDER_VERSION} as builder
 
 # Copy full application (to ensure artisan exists before composer install)
 COPY . .
